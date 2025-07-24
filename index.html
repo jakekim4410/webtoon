@@ -236,6 +236,13 @@
         .webtoon-link-button:hover {
             background-color: #4338ca; /* hover:bg-indigo-700 */
         }
+        /* 광고 컨테이너 스타일 추가 */
+        .ad-container {
+            margin-top: 2rem; /* 상단 여백 추가 */
+            display: flex;
+            justify-content: center; /* 가운데 정렬 */
+            width: 100%; /* 너비 100% */
+        }
     </style>
 </head>
 <body>
@@ -408,7 +415,17 @@
                 <button id="go-back-btn" class="action-button bg-red-500 hover:bg-red-600">처음으로 돌아가기</button>
             </div>
         </div>
+
+        <!-- Kakao AdSense Code -->
+        <div class="ad-container">
+            <ins class="kakao_ad_area"
+            data-ad-unit = "DAN-rTdBJ013idLpa8lN"
+            data-ad-width = "300"
+            data-ad-height = "250"></ins>
+        </div>
     </div>
+
+    <script type="text/javascript" src="//t1.daumcdn.net/kas/static/ba.min.js" async></script>
 
     <script>
         // 웹툰 데이터 (다양한 감성/장르 키워드, 인기도, 대상 성별/연령대 추가)
@@ -552,7 +569,7 @@
             { id: "webtoon134", title: "신과 함께 시즌2", keywords: ["판타지", "드라마", "감동", "철학", "성장", "슬픔"], description: "죽은 자들이 겪는 저승에서의 이야기. 더욱 깊은 통찰.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=119875", thumbnail: "https://placehold.co/192x256/4a5568/ffffff?text=신과함께2", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["20s", "30s+"] },
             { id: "webtoon135", title: "뷰티풀 군바리 시즌2", keywords: ["드라마", "현실", "성장", "슬픔", "화남", "군대"], description: "여성 의무경찰들의 군대 생활 이야기. 더욱 현실적인 군대 드라마.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=670146", thumbnail: "https://placehold.co/192x256/6b7280/ffffff?text=뷰티풀군바리2", popularity: "major", target_gender: ["female"], target_age_groups: ["teen", "20s", "30s+"] },
             { id: "webtoon136", title: "복학왕 시즌2", keywords: ["코믹", "일상", "병맛", "웃김", "사회풍자", "지루함"], description: "기안84 작가의 현실 풍자 개그 웹툰. 더욱 강력해진 사회 비판적인 유머.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=626907", thumbnail: "https://placehold.co/192x256/d1d5db/ffffff?text=복학왕2", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["20s", "30s+"] },
-            { id: "webtoon137", title: "갓 오브 하이스쿨 시즌2", keywords: ["액션", "판타지", "싸움", "성장", "긴장", "사이다"], description: "전국 고교생 최강자를 가리는 대회에서 벌어지는 이야기. 더욱 화려한 액션 판타지.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=318996", thumbnail: "https://placehold.co/192x256/3b82f6/ffffff?text=갓오하2", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon137", title: "갓 오브 하이스쿨 시즌2", keywords: ["액션", "판타지", "싸움", "성장", "긴장", "사이다"], description: "전국 고교생 최강자를 가리는 대회에서 벌어지는 이야기. 화려한 액션 판타지.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=318996", thumbnail: "https://placehold.co/192x256/3b82f6/ffffff?text=갓오하2", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["teen", "20s"] },
             { id: "webtoon138", title: "투신전생기 시즌2", keywords: ["판타지", "액션", "성장", "복수", "사이다", "무협"], description: "배신당한 투신이 과거로 회귀하여 복수를 다짐하는 이야기. 더욱 시원한 복수극.", platform: "카카오웹툰", link: "https://webtoon.kakao.com/content/%ED%88%AC%EC%8B%A0%EC%A0%84%EC%83%9D%EA%B8%B0-2/12345", thumbnail: "https://placehold.co/192x256/60a5fa/ffffff?text=투신전생기2", popularity: "minor", target_gender: ["male"], target_age_groups: ["teen", "20s", "30s+"] },
             { id: "webtoon139", title: "나 혼자 탑에서 회귀 시즌2", keywords: ["판타지", "액션", "성장", "회귀", "사이다", "긴장"], description: "탑에서 회귀한 주인공이 과거의 후회를 바로잡는 이야기. 압도적인 능력으로 성장.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=770175", thumbnail: "https://placehold.co/192x256/818cf8/ffffff?text=나혼탑2", popularity: "minor", target_gender: ["male"], target_age_groups: ["teen", "20s"] },
             { id: "webtoon140", title: "호텔 델루나 시즌2", keywords: ["판타지", "로맨스", "드라마", "슬픔", "감동", "반전"], description: "떠도는 영혼들에게 서비스를 제공하는 호텔 델루나의 이야기. 더욱 신비로운 로맨스 판타지.", platform: "카카오웹툰", link: "https://webtoon.kakao.com/content/%ED%98%B8%ED%85%94-%EB%8D%B8%EB%A3%A8%EB%82%98-2/12345", thumbnail: "https://placehold.co/192x256/a78bfa/ffffff?text=호텔델루나2", popularity: "major", target_gender: ["female"], target_age_groups: ["20s", "30s+"] },
