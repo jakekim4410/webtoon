@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>오늘의 웹툰 감정 분석기: 내 감정에 맞는 웹툰은?</title>
+    <!-- Tailwind CSS CDN 로드 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Inter 폰트 적용 (Tailwind 기본 폰트) */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f2f5; /* 부드러운 배경색 */
+            display: flex;
+            justify-content: center;
+            align-items: flex-start; /* 상단 정렬 */
+            min-height: 100vh;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .container {
+            max-width: 960px; /* 컨테이너 너비 확장 */
+            width: 100%;
+            background-color: #ffffff;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            text-align: center;
+            margin-top: 20px; /* 상단 여백 추가 */
+        }
+        /* 공통 선택 라벨 스타일 */
+        .selection-label {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem; /* p-4 */
+            margin: 0.5rem; /* m-2 */
+            background-color: #dbeafe; /* bg-blue-100 */
+            color: #1e40af; /* text-blue-800 */
+            border-radius: 0.75rem; /* rounded-xl */
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); /* shadow-md */
+            transition-property: all; /* transition-all */
+            transition-duration: 300ms; /* duration-300 */
+            transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); /* ease-in-out */
+            cursor: pointer;
+            font-size: 1.125rem; /* text-lg */
+            font-weight: 600; /* font-semibold */
+            min-width: 100px; /* 최소 너비 */
+            min-height: 50px; /* 높이 조정 */
+            position: relative; /* 자식 input의 absolute 포지셔닝을 위해 */
+            overflow: hidden; /* 자식 input이 라벨 밖으로 나가지 않도록 */
+        }
+        /* 선택된 상태 스타일 */
+        .selection-label.selected {
+            background-color: #3b82f6; /* bg-blue-500 */
+            color: #ffffff; /* text-white */
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04); /* shadow-xl */
+        }
+        .selection-label:hover {
+            background-color: #bfdbfe; /* hover:bg-blue-200 */
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); /* hover:shadow-lg */
+        }
+
+        /* 이모지 크기 (감정 선택용) */
+        .selection-label .emoji {
+            font-size: 3rem;
+            line-height: 1;
+        }
+        /* 텍스트 크기 */
+        .selection-label .text {
+            font-size: 1rem;
+            margin-top: 0;
+            margin-left: 0.5rem;
+        }
+
+        /* 실제 input 요소 숨기기 (라벨 클릭으로 제어) */
+        .selection-label input[type="radio"],
+        .selection-label input[type="checkbox"] {
+            position: absolute;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            cursor: pointer;
+            z-index: 1; /* 라벨 콘텐츠 위에 위치하여 클릭 이벤트 가로챔 */
+        }
+
+        .action-button {
+            background-color: #9333ea; /* bg-purple-600 */
+            color: #ffffff; /* text-white */
+            padding-left: 1.5rem; /* px-6 */
+            padding-right: 1.5rem; /* px-6 */
+            padding-top: 0.75rem; /* py-3 */
+            padding-bottom: 0.75rem; /* py-3 */
+            border-radius: 0.75rem; /* rounded-xl */
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); /* shadow-lg */
+            transition-property: all; /* transition-all */
+            transition-duration: 300ms; /* duration-300 */
+            transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); /* ease-in-out */
+            font-weight: 700; /* font-bold */
+            font-size: 1.125rem; /* text-lg */
+        }
+        .action-button:hover {
+            background-color: #7e22ce; /* hover:bg-purple-700 */
+        }
+
+        .webtoon-card {
+            display: flex;
+            flex-direction: column; /* flex-col */
+            align-items: center;
+            background-color: #f9fafb; /* bg-gray-50 */
+            border-radius: 0.75rem; /* rounded-xl */
+            padding: 1rem; /* p-4 */
+            margin-top: 1rem; /* mt-4 */
+            box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06); /* shadow-inner */
+            text-align: left;
+            flex-grow: 1; /* 그리드 내에서 카드들이 공간을 채우도록 */
+        }
+        @media (min-width: 640px) { /* sm breakpoint */
+            .webtoon-card {
+                flex-direction: row; /* sm:flex-row */
+            }
+        }
+
+        .webtoon-thumbnail-container {
+            width: 100%; /* w-full */
+            height: 160px; /* 고정 높이 */
+            border-radius: 0.5rem; /* rounded-lg */
+            margin-bottom: 0.75rem; /* mb-3 */
+            background-color: #cccccc; /* 기본 회색 배경 */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden; /* 이미지 넘침 방지 */
+            position: relative; /* 내부 요소의 absolute 포지셔닝을 위해 */
+            min-width: 128px; /* 썸네일 최소 너비 */
+            min-height: 160px; /* 썸네일 최소 높이 */
+            /* 이미지 로드 없이 제목을 표시하기 위한 스타일 */
+            flex-direction: column; /* 제목을 중앙에 배치 */
+            text-align: center;
+            padding: 1rem;
+            box-sizing: border-box;
+        }
+        @media (min-width: 640px) { /* sm breakpoint */
+            .webtoon-thumbnail-container {
+                width: 8rem; /* sm:w-32 */
+                height: 160px; /* 높이 유지 */
+                margin-bottom: 0; /* sm:mb-0 */
+                margin-right: 1rem; /* sm:mr-4 */
+            }
+        }
+
+        /* 썸네일 컨테이너 내 제목 스타일 */
+        .webtoon-thumbnail-container .webtoon-title-fallback {
+            font-size: 1.5rem; /* text-2xl */
+            font-weight: 700; /* font-bold */
+            color: #111827; /* text-gray-900 */
+            line-height: 1.2;
+            word-break: keep-all; /* 단어 단위로 줄바꿈 */
+        }
+
+
+        .webtoon-info {
+            flex-grow: 1;
+        }
+        .webtoon-title {
+            font-size: 1.25rem; /* text-xl */
+            font-weight: 700; /* font-bold */
+            color: #111827; /* text-gray-900 */
+            margin-bottom: 0.25rem; /* mb-1 */
+        }
+        .webtoon-description {
+            color: #374151; /* text-gray-700 */
+            font-size: 0.875rem; /* text-sm */
+            margin-bottom: 0.5rem; /* mb-2 */
+            display: -webkit-box;
+            -webkit-line-clamp: 3; /* line-clamp-3 */
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .webtoon-detail-info {
+            font-size: 0.75rem; /* text-xs */
+            color: #4b5563; /* text-gray-600 */
+            margin-bottom: 0.25rem;
+        }
+        .webtoon-keywords {
+            font-size: 0.75rem; /* text-xs */
+            color: #6b7280; /* text-gray-500 */
+            margin-top: 0.5rem;
+        }
+        .webtoon-keywords span {
+            background-color: #e0e7ff; /* bg-indigo-100 */
+            color: #4338ca; /* text-indigo-800 */
+            padding: 0.2rem 0.5rem;
+            border-radius: 0.5rem;
+            margin-right: 0.25rem;
+            margin-bottom: 0.25rem;
+            display: inline-block;
+        }
+
+        /* 추천 결과 그리드 */
+        #webtoon-display-grid {
+            display: grid;
+            grid-template-columns: repeat(1, minmax(0, 1fr)); /* grid-cols-1 */
+            gap: 1.5rem; /* gap-6 */
+        }
+        @media (min-width: 768px) { /* md breakpoint */
+            #webtoon-display-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr)); /* md:grid-cols-2 */
+            }
+        }
+
+        /* 필터 섹션 공통 스타일 */
+        .filter-section {
+            margin-bottom: 1.5rem; /* mb-6 */
+            text-align: left;
+            padding: 1rem; /* p-4 */
+            background-color: #f9fafb; /* bg-gray-50 */
+            border-radius: 0.5rem; /* rounded-lg */
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); /* shadow-sm */
+        }
+        /* 웹툰 링크 버튼 스타일 */
+        .webtoon-link-button {
+            display: inline-block;
+            background-color: #4f46e5; /* bg-indigo-600 */
+            color: #ffffff; /* text-white */
+            padding: 0.5rem 1rem; /* py-2 px-4 */
+            border-radius: 0.5rem; /* rounded-lg */
+            font-size: 0.875rem; /* text-sm */
+            font-weight: 600; /* font-semibold */
+            margin-top: 0.75rem; /* mt-3 */
+            text-decoration: none; /* 링크 밑줄 제거 */
+            transition: background-color 0.3s ease;
+        }
+        .webtoon-link-button:hover {
+            background-color: #4338ca; /* hover:bg-indigo-700 */
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-4xl font-extrabold text-gray-900 mb-8">오늘의 웹툰 감정 분석기</h1>
+        <p class="text-xl text-gray-700 mb-8">당신에게 딱 맞는 웹툰을 찾아드릴게요! 아래 질문에 답해주세요.</p>
+
+        <!-- Input Section: 사용자 입력을 받는 부분 -->
+        <div id="input-section">
+            <!-- 1. 성별 선택 -->
+            <div class="filter-section">
+                <p class="text-lg font-semibold text-gray-800 mb-3">1. 성별을 선택해주세요:</p>
+                <div class="flex flex-wrap gap-4">
+                    <label class="selection-label">
+                        <input type="radio" name="gender" value="all" checked>
+                        <span class="text">상관없음</span>
+                    </label>
+                    <label class="selection-label">
+                        <input type="radio" name="gender" value="male">
+                        <span class="text">남성</span>
+                    </label>
+                    <label class="selection-label">
+                        <input type="radio" name="gender" value="female">
+                        <span class="text">여성</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- 2. 연령대 선택 -->
+            <div class="filter-section">
+                <p class="text-lg font-semibold text-gray-800 mb-3">2. 연령대를 선택해주세요:</p>
+                <select id="age-filter" class="p-2 border border-gray-300 rounded-lg w-full sm:w-auto focus:ring-blue-500 focus:border-blue-500">
+                    <option value="all">전체</option>
+                    <option value="teen">10대</option>
+                    <option value="20s">20대</option>
+                    <option value="30s+">30대 이상</option>
+                </select>
+            </div>
+
+            <!-- 3. 취향(장르/분위기) 선택 -->
+            <div class="filter-section">
+                <p class="text-lg font-semibold text-gray-800 mb-3">3. 선호하는 취향(장르/분위기)을 선택해주세요 (복수 선택 가능):</p>
+                <div id="preference-selection-checkboxes" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                    <label class="selection-label">
+                        <input type="checkbox" name="preference" value="로맨스">
+                        <span class="text">💖 로맨스</span>
+                    </label>
+                    <label class="selection-label">
+                        <input type="checkbox" name="preference" value="액션">
+                        <span class="text">💪 액션</span>
+                    </label>
+                    <label class="selection-label">
+                        <input type="checkbox" name="preference" value="코믹">
+                        <span class="text">🤣 코믹</span>
+                    </label>
+                    <label class="selection-label">
+                        <input type="checkbox" name="preference" value="판타지">
+                        <span class="text">🧙 판타지</span>
+                    </label>
+                    <label class="selection-label">
+                        <input type="checkbox" name="preference" value="일상">
+                        <span class="text">☕ 일상/힐링</span>
+                    </label>
+                    <label class="selection-label">
+                        <input type="checkbox" name="preference" value="스릴러">
+                        <span class="text">👻 스릴러</span>
+                    </label>
+                    <label class="selection-label">
+                        <input type="checkbox" name="preference" value="무협">
+                        <span class="text">⚔️ 무협</span>
+                    </label>
+                    <label class="selection-label">
+                        <input type="checkbox" name="preference" value="스포츠">
+                        <span class="text">🚴 스포츠</span>
+                    </label>
+                    <label class="selection-label">
+                        <input type="checkbox" name="preference" value="성장">
+                        <span class="text">🌱 성장</span>
+                    </label>
+                    <label class="selection-label">
+                        <input type="checkbox" name="preference" value="학원">
+                        <span class="text">🏫 학원</span>
+                    </label>
+                    <label class="selection-label">
+                        <input type="checkbox" name="preference" value="BL/GL">
+                        <span class="text">🌈 BL/GL</span>
+                    </label>
+                    <label class="selection-label">
+                        <input type="checkbox" name="preference" value="드라마">
+                        <span class="text">🎭 드라마</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- 4. 오늘의 감정 선택 -->
+            <div class="filter-section">
+                <p class="text-lg font-semibold text-gray-800 mb-3">4. 오늘의 감정은 어떤가요? (복수 선택 가능):</p>
+                <div id="mood-selection-checkboxes" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                    <label class="selection-label">
+                        <input type="checkbox" name="mood" value="웃김">
+                        <span class="emoji">🤣</span>
+                        <span class="text">웃김</span>
+                    </label>
+                    <label class="selection-label">
+                        <input type="checkbox" name="mood" value="슬픔">
+                        <span class="emoji">😭</span>
+                        <span class="text">슬픔</span>
+                    </label>
+                    <label class="selection-label">
+                        <input type="checkbox" name="mood" value="화남">
+                        <span class="emoji">😡</span>
+                        <span class="text">화남</span>
+                    </label>
+                    <label class="selection-label">
+                        <input type="checkbox" name="mood" value="지루함">
+                        <span class="emoji">😴</span>
+                        <span class="text">지루함</span>
+                    </label>
+                    <label class="selection-label">
+                        <input type="checkbox" name="mood" value="설렘">
+                        <span class="emoji">💖</span>
+                        <span class="text">설렘</span>
+                    </label>
+                    <label class="selection-label">
+                        <input type="checkbox" name="mood" value="희망">
+                        <span class="emoji">✨</span>
+                        <span class="text">희망</span>
+                    </label>
+                    <label class="selection-label">
+                        <input type="checkbox" name="mood" value="사이다">
+                        <span class="emoji">🥤</span>
+                        <span class="text">사이다</span>
+                    </label>
+                    <label class="selection-label">
+                        <input type="checkbox" name="mood" value="반전">
+                        <span class="emoji">🤯</span>
+                        <span class="text">반전</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- 5. 웹툰 인기도 필터 -->
+            <div class="filter-section">
+                <p class="text-lg font-semibold text-gray-800 mb-3">5. 웹툰 인기도:</p>
+                <select id="popularity-filter" class="p-2 border border-gray-300 rounded-lg w-full sm:w-auto focus:ring-blue-500 focus:border-blue-500">
+                    <option value="all">전체</option>
+                    <option value="major">메이저 (잘 알려진 웹툰)</option>
+                    <option value="minor">마이너 (숨겨진 보석같은 웹툰)</option>
+                </select>
+            </div>
+
+            <!-- 메인 추천 버튼 -->
+            <button id="get-recommendation-btn" class="action-button w-full mb-4">웹툰 추천받기</button>
+            <button id="random-recommend-btn" class="action-button bg-gray-600 hover:bg-gray-700 w-full">랜덤 웹툰 추천</button>
+        </div>
+
+        <!-- Webtoon Recommendation Section (initially hidden) -->
+        <div id="recommendation-result" class="hidden">
+            <h2 id="recommendation-title" class="text-3xl font-bold text-gray-900 mb-6">당신에게 추천하는 웹툰!</h2>
+            <!-- 로딩 스피너 추가 -->
+            <div id="loading-spinner" class="hidden flex justify-center items-center mt-8">
+                <div class="animate-spin rounded-full h-12 w-12 border-b-4 border-purple-500"></div>
+                <p class="ml-4 text-purple-600 text-lg font-semibold">웹툰을 추천 중입니다...</p>
+            </div>
+            <div id="webtoon-display-grid" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Webtoon cards will be inserted here by JavaScript -->
+            </div>
+            <div class="flex flex-wrap justify-center gap-4 mt-8">
+                <button id="another-recommend-btn" class="action-button bg-blue-600 hover:bg-blue-700">다른 웹툰 추천</button>
+                <button id="go-back-btn" class="action-button bg-red-500 hover:bg-red-600">처음으로 돌아가기</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 웹툰 데이터 (다양한 감성/장르 키워드, 인기도, 대상 성별/연령대 추가)
+        // 실제 서비스에서는 저작권 문제로 썸네일 URL을 직접 사용하기보다 링크만 제공하거나,
+        // 플랫폼에서 제공하는 공식 API를 통해 썸네일을 가져와야 합니다.
+        // 여기서는 예시를 위해 placehold.co 이미지를 사용합니다.)
+        const webtoonData = [
+            { id: "webtoon001", title: "외모지상주의", keywords: ["액션", "긴장", "시원함", "성장", "싸움", "화남", "학원", "사이다"], description: "따돌림 당하던 주인공이 두 개의 몸을 갖게 되며 벌어지는 이야기. 학원물 액션의 대명사.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=641253", thumbnail: "https://placehold.co/192x256/a78bfa/ffffff?text=외모지상주의", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon002", title: "화산귀환", keywords: ["액션", "무협", "유쾌", "성장", "사이다", "희망", "판타지", "웃김"], description: "매화검존 청명이 환생하여 망해버린 화산을 다시 일으키는 이야기. 시원한 전개가 일품.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=769209", thumbnail: "https://placehold.co/192x256/818cf8/ffffff?text=화산귀환", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["teen", "20s", "30s+"] },
+            { id: "webtoon003", title: "내 남편과 결혼해줘", keywords: ["복수", "로맨스", "사이다", "설렘", "화남", "오피스", "드라마", "반전"], description: "시한부인 줄 알았던 아내가 과거로 회귀하여 인생을 바꾸는 드라마. 통쾌한 복수극.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=783052", thumbnail: "https://placehold.co/192x256/fbcfe8/ffffff?text=내남결", popularity: "major", target_gender: ["female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon004", title: "유미의 세포들", keywords: ["일상", "공감", "로맨스", "성장", "코믹", "지루함", "설렘", "웃김", "드라마", "힐링"], description: "평범한 직장인 유미의 일상과 그녀의 세포들이 벌이는 유쾌한 이야기. 현실 공감 로맨스.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=651673", thumbnail: "https://placehold.co/192x256/9ca3af/ffffff?text=유미의세포들", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon005", title: "역대급 영지 설계사", keywords: ["개그", "사이다", "판타지", "성장", "유쾌", "웃김", "희망", "코믹"], description: "잠에서 깨어보니 소설 속 망나니 영주가 되었다! 영지를 개발하는 이야기. 병맛 개그 판타지.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=770156", thumbnail: "https://placehold.co/192x256/a3e635/ffffff?text=영지설계사", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon006", title: "전지적 독자 시점", keywords: ["판타지", "긴장", "흥미", "반전", "성장", "액션", "희망", "스릴러"], description: "자신이 읽던 소설의 내용대로 세상이 변하면서 벌어지는 이야기. 몰입감 최고의 판타지.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=747269", thumbnail: "https://placehold.co/192x256/fcd34d/ffffff?text=전독시", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["teen", "20s", "30s+"] },
+            { id: "webtoon007", title: "겟앰프드", keywords: ["개그", "병맛", "액션", "코믹", "웃김", "일상"], description: "대난투 액션게임 '겟앰프드'의 유쾌한 일상 웹툰. 추억의 게임 웹툰.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=776269", thumbnail: "https://placehold.co/192x256/fca5a5/ffffff?text=겟앰프드", popularity: "minor", target_gender: ["male"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon008", title: "어느 날 갑자기", keywords: ["슬픔", "감동", "일상", "치유", "드라마", "힐링"], description: "평범한 일상 속에서 벌어지는 따뜻하고 감동적인 이야기. 잔잔한 감동.", platform: "카카오웹툰", link: "https://webtoon.kakao.com/content/%EC%96%B4%EB%8A%90-%EB%82%A0-%EA%B0%91%EC%9E%90%EA%B8%B0/12345", thumbnail: "https://placehold.co/192x256/a78bfa/ffffff?text=어느날갑자기", popularity: "minor", target_gender: ["female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon009", title: "나 혼자만 레벨업", keywords: ["액션", "성장", "판타지", "사이다", "긴장", "희망"], description: "최약체 헌터가 인류 최강으로 각성하는 이야기. 압도적인 스케일.", platform: "카카오웹툰", link: "https://webtoon.kakao.com/content/%EB%82%98-%ED%98%BC%EC%9E%90%EB%A7%8C-%EB%A0%88%EB%B2%A8%EC%97%85/12345", thumbnail: "https://placehold.co/192x256/818cf8/ffffff?text=나혼렙", popularity: "major", target_gender: ["male"], target_age_groups: ["teen", "20s", "30s+"] },
+            { id: "webtoon010", title: "바른연애 길잡이", keywords: ["로맨스", "설렘", "성장", "일상", "학원", "드라마", "공감"], description: "연애에 서툰 주인공의 좌충우돌 연애 성장기. 캠퍼스 로맨스의 정석.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=703846", thumbnail: "https://placehold.co/192x256/fbcfe8/ffffff?text=바른연애", popularity: "major", target_gender: ["female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon011", title: "신의 탑", keywords: ["판타지", "액션", "성장", "긴장", "모험", "희망"], description: "자신이 원하는 모든 것을 얻을 수 있다는 탑을 오르는 소년의 이야기.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=183559", thumbnail: "https://placehold.co/192x256/4a5568/ffffff?text=신의탑", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["teen", "20s", "30s+"] },
+            { id: "webtoon012", title: "호랑이형님", keywords: ["액션", "판타지", "긴장", "무협", "싸움", "스릴러"], description: "신비한 힘을 가진 호랑이와 인간들의 대서사시.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=670143", thumbnail: "https://placehold.co/192x256/2d3748/ffffff?text=호랑이형님", popularity: "major", target_gender: ["male"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon013", title: "연애혁명", keywords: ["코믹", "로맨스", "학원", "일상", "웃김", "설렘"], description: "짝사랑 공주 주영과 냉미녀 자림의 신개념 개그 로맨스. 학원 연애물의 바이블.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=570503", thumbnail: "https://placehold.co/192x256/ed8936/ffffff?text=연애혁명", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon014", title: "마음의 소리", keywords: ["개그", "일상", "코믹", "웃김", "병맛", "힐링"], description: "조석 작가의 기상천외한 일상 개그 웹툰. 레전드 시트콤.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=20853", thumbnail: "https://placehold.co/192x256/ecc94b/ffffff?text=마음의소리", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["teen", "20s", "30s+"] },
+            { id: "webtoon015", title: "독립일기", keywords: ["일상", "공감", "코믹", "힐링", "웃김", "지루함"], description: "자취 생활의 애환과 소소한 행복을 담은 일상툰. 현실 공감 100%.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=758150", thumbnail: "https://placehold.co/192x256/d69e2e/ffffff?text=독립일기", popularity: "minor", target_gender: ["male", "female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon016", title: "윈드브레이커", keywords: ["액션", "학원", "성장", "스포츠", "긴장"], description: "자전거 크루들의 뜨거운 우정과 경쟁을 그린 스포츠 액션 웹툰.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=626907", thumbnail: "https://placehold.co/192x256/38a169/ffffff?text=윈드브레이커", popularity: "major", target_gender: ["male"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon017", title: "여신강림", keywords: ["로맨스", "학원", "설렘", "일상", "드라마", "공감"], description: "메이크업으로 여신이 된 여고생의 아슬아슬 이중생활 로맨스.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=703845", thumbnail: "https://placehold.co/192x256/48bb78/ffffff?text=여신강림", popularity: "major", target_gender: ["female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon018", title: "참교육", keywords: ["액션", "사이다", "화남", "학원", "긴장"], description: "무너진 교권을 바로 세우기 위한 정의 구현 웹툰. 통쾌한 액션.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=758037", thumbnail: "https://placehold.co/192x256/3182ce/ffffff?text=참교육", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["teen", "20s", "30s+"] },
+            { id: "webtoon019", title: "좀비딸", keywords: ["코믹", "슬픔", "일상", "감동", "드라마", "웃김", "힐링"], description: "어느 날 갑자기 좀비가 된 딸과 아빠의 기묘한 동거 이야기. 웃음과 감동.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=703849", thumbnail: "https://placehold.co/192x256/63b3ed/ffffff?text=좀비딸", popularity: "minor", target_gender: ["male", "female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon020", title: "튜토리얼 탑의 회귀자", keywords: ["판타지", "액션", "성장", "긴장", "사이다", "무협"], description: "끝없는 튜토리얼 탑에 갇혔던 주인공이 회귀하여 다시 탑을 오르는 이야기.", platform: "카카오웹툰", link: "https://webtoon.kakao.com/content/%ED%8A%9C%ED%86%A0%EB%A6%AC%EC%96%BC-%ED%86%B1%EC%9D%98-%ED%9A%8C%EA%B7%80%EC%9E%90/12345", thumbnail: "https://placehold.co/192x256/7f9cf5/ffffff?text=튜토리얼탑", popularity: "minor", target_gender: ["male"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon021", title: "나노마신", keywords: ["무협", "액션", "성장", "사이다", "판타지", "긴장"], description: "미래에서 온 나노 머신을 얻은 주인공의 무협 세계 정복기.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=738466", thumbnail: "https://placehold.co/192x256/6b7280/ffffff?text=나노마신", popularity: "major", target_gender: ["male"], target_age_groups: ["teen", "20s", "30s+"] },
+            { id: "webtoon022", title: "재혼 황후", keywords: ["로맨스", "복수", "드라마", "설렘", "화남", "궁중", "반전"], description: "황제에게 버림받은 황후가 재혼을 선언하며 벌어지는 이야기. 통쾌한 로맨스 판타지.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=738467", thumbnail: "https://placehold.co/192x256/fecaca/ffffff?text=재혼황후", popularity: "major", target_gender: ["female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon023", title: "독고", keywords: ["액션", "학원", "복수", "싸움", "긴장", "사이다"], description: "학교 폭력에 맞서는 주인공의 처절한 싸움 이야기. 강렬한 액션.", platform: "카카오웹툰", link: "https://webtoon.kakao.com/content/%EB%8F%85%EA%B3%A0/12345", thumbnail: "https://placehold.co/192x256/4b5563/ffffff?text=독고", popularity: "major", target_gender: ["male"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon024", title: "연놈", keywords: ["로맨스", "학원", "일상", "설렘", "공감", "드라마"], description: "풋풋한 고등학생들의 성장과 연애 이야기. 현실적인 학원 로맨스.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=694836", thumbnail: "https://placehold.co/192x256/fecdd3/ffffff?text=연놈", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon025", title: "쌉니다 천리마마트", keywords: ["코믹", "일상", "개그", "웃김", "병맛", "사회풍자"], description: "좌천된 사장이 문제투성이 마트를 살리는 기상천외한 이야기. 병맛 개그의 진수.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=670144", thumbnail: "https://placehold.co/192x256/d1d5db/ffffff?text=천리마마트", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon026", title: "타인은 지옥이다", keywords: ["스릴러", "긴장", "공포", "반전", "심리", "화남"], description: "낯선 고시원에서 벌어지는 기괴한 사건들. 숨 막히는 심리 스릴러.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=703844", thumbnail: "https://placehold.co/192x256/4a4a4a/ffffff?text=타인은지옥이다", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon027", title: "여고생 드래곤", keywords: ["판타지", "코믹", "일상", "웃김", "병맛"], description: "평범한 여고생의 몸에 갇힌 드래곤의 좌충우돌 라이프. 기상천외한 코믹 판타지.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=758039", thumbnail: "https://placehold.co/192x256/a8a29e/ffffff?text=여고생드래곤", popularity: "minor", target_gender: ["male", "female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon028", title: "정년이", keywords: ["드라마", "성장", "희망", "감동", "역사", "뮤지컬"], description: "1950년대 국극단을 배경으로 한 여성들의 꿈과 열정 이야기. 감동적인 성장 드라마.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=728750", thumbnail: "https://placehold.co/192x256/fca5a5/ffffff?text=정년이", popularity: "major", target_gender: ["female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon029", title: "취사병 전설이 되다", keywords: ["판타지", "성장", "코믹", "사이다", "요리"], description: "게임 속 취사병으로 빙의한 주인공의 군대 요리 정복기. 유쾌한 요리 판타지.", platform: "카카오웹툰", link: "https://webtoon.kakao.com/content/%EC%B7%A8%EC%82%AC%EB%B3%91-%EC%A0%84%EC%84%B8%EC%9D%B4-%EB%90%98%EB%8B%A4/12345", thumbnail: "https://placehold.co/192x256/9ca3af/ffffff?text=취사병", popularity: "major", target_gender: ["male"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon030", title: "소녀의 세계", keywords: ["일상", "성장", "공감", "드라마", "우정", "힐링"], description: "평범한 여고생들의 우정과 성장 이야기. 현실 공감 100%.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=654774", thumbnail: "https://placehold.co/192x256/fbcfe8/ffffff?text=소녀의세계", popularity: "major", target_gender: ["female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon031", title: "멸망한 세계의 유일한 생존자", keywords: ["판타지", "액션", "생존", "긴장", "스릴러", "성장"], description: "멸망한 세계에서 홀로 살아남은 주인공의 생존기. 암울하지만 희망적인 이야기.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=770157", thumbnail: "https://placehold.co/192x256/374151/ffffff?text=멸망생존자", popularity: "minor", target_gender: ["male", "female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon032", title: "오늘도 사랑스럽개", keywords: ["로맨스", "코믹", "판타지", "설렘", "웃김", "드라마"], description: "키스하면 개로 변하는 저주에 걸린 여자의 로맨스 코미디. 유쾌하고 사랑스러운 이야기.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=703848", thumbnail: "https://placehold.co/192x256/fecdd3/ffffff?text=오늘도사랑스럽개", popularity: "major", target_gender: ["female"], target_age_groups: ["teen", "20s", "30s+"] },
+            { id: "webtoon033", title: "호러와 로맨스", keywords: ["로맨스", "스릴러", "코믹", "반전", "설렘", "웃김"], description: "호러 웹툰 작가와 로맨스 웹툰 작가의 기묘한 동거 로맨스. 예측불허의 전개.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=703852", thumbnail: "https://placehold.co/192x256/a78bfa/ffffff?text=호러와로맨스", popularity: "minor", target_gender: ["male", "female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon034", title: "캐슬", keywords: ["액션", "스릴러", "긴장", "복수", "느와르"], description: "어둠의 세계에서 벌어지는 치열한 권력 싸움. 몰입감 넘치는 느와르 액션.", platform: "카카오웹툰", link: "https://webtoon.kakao.com/content/%EC%BA%90%EC%8A%AC/12345", thumbnail: "https://placehold.co/192x256/1f2937/ffffff?text=캐슬", popularity: "major", target_gender: ["male"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon035", title: "여성향 게임의 파멸 플래그밖에 없는 악역 영애로 전생해버렸다...", keywords: ["로맨스", "판타지", "코믹", "설렘", "반전", "성장"], description: "여성향 게임의 악역 영애로 전생한 주인공의 파멸 회피기. 유쾌한 역하렘 판타지.", platform: "카카오페이지", link: "https://page.kakao.com/home?seriesId=50000000", thumbnail: "https://placehold.co/192x256/fbcfe8/ffffff?text=악역영애", popularity: "major", target_gender: ["female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon036", title: "독립운동가 웹툰", keywords: ["드라마", "역사", "감동", "희망", "성장", "애국"], description: "잊혀진 독립운동가들의 이야기를 다룬 웹툰. 역사와 감동을 동시에.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=770158", thumbnail: "https://placehold.co/192x256/9ca3af/ffffff?text=독립운동가", popularity: "minor", target_gender: ["male", "female"], target_age_groups: ["teen", "20s", "30s+"] },
+            { id: "webtoon037", "title": "대학일기", keywords: ["일상", "코믹", "웃김", "공감", "지루함", "병맛"], description: "평범한 대학생의 좌충우돌 캠퍼스 라이프. 현실 공감 개그 웹툰.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=679564", thumbnail: "https://placehold.co/192x256/d1d5db/ffffff?text=대학일기", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon038", title: "프리드로우", keywords: ["학원", "액션", "코믹", "성장", "일상", "웃김"], description: "일진에서 벗어나고 싶은 주인공의 고군분투 학원물. 유쾌한 성장 드라마.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=597478", thumbnail: "https://placehold.co/192x256/a3e635/ffffff?text=프리드로우", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon039", title: "가담항설", keywords: ["판타지", "액션", "드라마", "성장", "감동", "동양풍"], description: "말이 곧 현실이 되는 세상에서 펼쳐지는 이야기. 아름다운 동양 판타지.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=694837", thumbnail: "https://placehold.co/192x256/fcd34d/ffffff?text=가담항설", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["teen", "20s", "30s+"] },
+            { id: "webtoon040", title: "정글고", keywords: ["코믹", "학원", "개그", "웃김", "병맛", "일상"], description: "기상천외한 정글고 학생들의 학교생활 이야기. 레전드 학원 개그 웹툰.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=60291", thumbnail: "https://placehold.co/192x256/ed8936/ffffff?text=정글고", popularity: "minor", target_gender: ["male", "female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon041", title: "아침을 지나 밤으로", keywords: ["로맨스", "일상", "드라마", "힐링", "설렘", "공감"], description: "잔잔한 일상 속에서 피어나는 따뜻한 로맨스 이야기. 감성적인 웹툰.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=770159", thumbnail: "https://placehold.co/192x256/fbcfe8/ffffff?text=아침밤", popularity: "minor", target_gender: ["female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon042", title: "이두나!", keywords: ["로맨스", "드라마", "설렘", "일상", "성장", "아이돌"], description: "은퇴한 아이돌과 평범한 대학생의 로맨스. 현실적인 청춘 로맨스.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=703850", thumbnail: "https://placehold.co/192x256/dbeafe/ffffff?text=이두나", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["20s"] },
+            { id: "webtoon043", title: "어쩌다 발견한 하루", keywords: ["로맨스", "판타지", "학원", "설렘", "반전", "드라마"], description: "만화 속 엑스트라임을 알게 된 여고생의 운명 개척 로맨스. 흥미진진한 스토리.", platform: "카카오웹툰", link: "https://webtoon.kakao.com/content/%EC%96%B4%EC%A9%8C%EB%8B%A4-%EB%B0%9C%EA%B2%AC%ED%95%9C-%ED%95%98%EB%A3%A8/12345", thumbnail: "https://placehold.co/192x256/bfdbfe/ffffff?text=어하루", popularity: "major", target_gender: ["female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon044", title: "독립일기 시즌2", keywords: ["일상", "공감", "코믹", "힐링", "웃김", "지루함"], description: "자취 생활의 애환과 소소한 행복을 담은 일상툰. 더욱 강력해진 현실 공감.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=770160", thumbnail: "https://placehold.co/192x256/d69e2e/ffffff?text=독립일기2", popularity: "minor", target_gender: ["male", "female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon045", title: "신과 함께", keywords: ["판타지", "드라마", "감동", "철학", "성장", "슬픔"], description: "죽은 자들이 겪는 저승에서의 이야기. 삶과 죽음에 대한 깊은 통찰.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=119874", thumbnail: "https://placehold.co/192x256/4a5568/ffffff?text=신과함께", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon046", title: "뷰티풀 군바리", keywords: ["드라마", "현실", "성장", "슬픔", "화남", "군대"], description: "여성 의무경찰들의 군대 생활 이야기. 현실적인 군대 드라마.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=648419", thumbnail: "https://placehold.co/192x256/6b7280/ffffff?text=뷰티풀군바리", popularity: "major", target_gender: ["female"], target_age_groups: ["teen", "20s", "30s+"] },
+            { id: "webtoon047", title: "복학왕", keywords: ["코믹", "일상", "병맛", "웃김", "사회풍자", "지루함"], description: "기안84 작가의 현실 풍자 개그 웹툰. 사회 비판적인 유머.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=626906", thumbnail: "https://placehold.co/192x256/d1d5db/ffffff?text=복학왕", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon048", title: "갓 오브 하이스쿨", keywords: ["액션", "판타지", "싸움", "성장", "긴장", "사이다"], description: "전국 고교생 최강자를 가리는 대회에서 벌어지는 이야기. 화려한 액션 판타지.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=318995", thumbnail: "https://placehold.co/192x256/3b82f6/ffffff?text=갓오하", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon049", title: "투신전생기", keywords: ["판타지", "액션", "성장", "복수", "사이다", "무협"], description: "배신당한 투신이 과거로 회귀하여 복수를 다짐하는 이야기. 시원한 복수극.", platform: "카카오웹툰", link: "https://webtoon.kakao.com/content/%ED%88%AC%EC%8B%A0%EC%A0%84%EC%83%9D%EA%B8%B0/12345", thumbnail: "https://placehold.co/192x256/60a5fa/ffffff?text=투신전생기", popularity: "minor", target_gender: ["male"], target_age_groups: ["teen", "20s", "30s+"] },
+            { id: "webtoon050", title: "나 혼자 탑에서 회귀", keywords: ["판타지", "액션", "성장", "회귀", "사이다", "긴장"], description: "탑에서 회귀한 주인공이 과거의 후회를 바로잡는 이야기. 압도적인 능력으로 성장.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=770161", thumbnail: "https://placehold.co/192x256/818cf8/ffffff?text=나혼탑", popularity: "minor", target_gender: ["male"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon051", title: "어느 날 공주가 되어버렸다", keywords: ["로맨스", "판타지", "드라마", "설렘", "성장", "궁중"], description: "소설 속 비운의 공주로 환생한 주인공의 생존 로맨스. 아름다운 그림체.", platform: "카카오페이지", link: "https://page.kakao.com/home?seriesId=50000001", thumbnail: "https://placehold.co/192x256/fbcfe8/ffffff?text=어공주", popularity: "major", target_gender: ["female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon052", title: "죽음에 관하여", keywords: ["드라마", "감동", "철학", "슬픔", "일상", "힐링"], description: "죽음과 삶의 의미를 되새기게 하는 옴니버스 웹툰. 깊은 여운을 남기는 작품.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=131388", thumbnail: "https://placehold.co/192x256/4a5568/ffffff?text=죽음에관하여", popularity: "minor", target_gender: ["male", "female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon053", title: "패션왕", keywords: ["코믹", "일상", "학원", "성장", "웃김", "병맛"], description: "패션으로 학교를 평정하려는 주인공의 이야기. 기안84의 초기 대표작.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=375620", thumbnail: "https://placehold.co/192x256/ecc94b/ffffff?text=패션왕", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon054", title: "호텔 델루나", keywords: ["판타지", "로맨스", "드라마", "슬픔", "감동", "반전"], description: "떠도는 영혼들에게 서비스를 제공하는 호텔 델루나의 이야기. 신비로운 로맨스 판타지.", platform: "카카오웹툰", link: "https://webtoon.kakao.com/content/%ED%98%B8%ED%85%94-%EB%8D%B8%EB%A3%A8%EB%82%98/12345", thumbnail: "https://placehold.co/192x256/a78bfa/ffffff?text=호텔델루나", popularity: "major", target_gender: ["female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon055", title: "백수세끼", keywords: ["일상", "공감", "코믹", "힐링", "웃김", "지루함"], description: "백수 생활의 소소한 즐거움과 애환을 담은 웹툰. 현실적인 공감 개그.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=758040", thumbnail: "https://placehold.co/192x256/dbeafe/ffffff?text=백수세끼", popularity: "minor", target_gender: ["male", "female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon056", title: "격기 3반", keywords: ["액션", "학원", "싸움", "성장", "긴장", "스포츠"], description: "격투기를 통해 성장하는 학생들의 이야기. 시원한 액션과 드라마.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=703851", thumbnail: "https://placehold.co/192x256/3182ce/ffffff?text=격기3반", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon057", title: "어글리후드", keywords: ["판타지", "액션", "스릴러", "반전", "사회비판", "긴장"], description: "외계인의 지배를 받는 세상에서 저항하는 주인공의 이야기. 독특한 세계관.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=703853", thumbnail: "https://placehold.co/192x256/4a4a4a/ffffff?text=어글리후드", popularity: "minor", target_gender: ["male", "female"], target_age_groups: ["teen", "20s", "30s+"] },
+            { id: "webtoon058", title: "N번째 연애", keywords: ["로맨스", "일상", "공감", "드라마", "설렘", "현실"], description: "현실적인 연애의 모습을 담은 웹툰. 많은 이들의 공감을 얻은 작품.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=703854", thumbnail: "https://placehold.co/192x256/fecdd3/ffffff?text=N번째연애", popularity: "major", target_gender: ["female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon059", title: "내일", keywords: ["드라마", "감동", "힐링", "슬픔", "희망", "사회문제"], description: "자살을 막는 저승사자들의 이야기. 따뜻한 위로와 감동.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=703855", thumbnail: "https://placehold.co/192x256/9ca3af/ffffff?text=내일", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["teen", "20s", "30s+"] },
+            { id: "webtoon060", title: "연애의 정령", keywords: ["로맨스", "코믹", "판타지", "설렘", "웃김", "일상"], description: "연애를 도와주는 정령과 함께하는 주인공의 로맨스. 유쾌하고 발랄한 이야기.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=694838", thumbnail: "https://placehold.co/192x256/fbcfe8/ffffff?text=연애의정령", popularity: "minor", target_gender: ["male", "female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon061", title: "선배, 그 립스틱 바르지 마요", keywords: ["로맨스", "오피스", "설렘", "드라마", "현실"], description: "직장 선배와 후배의 달콤한 오피스 로맨스. 현실적인 연애 이야기.", platform: "카카오페이지", link: "https://page.kakao.com/home?seriesId=50000002", thumbnail: "https://placehold.co/192x256/fecdd3/ffffff?text=선배립스틱", popularity: "major", target_gender: ["female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon062", title: "아도니스", keywords: ["판타지", "로맨스", "액션", "성장", "복수", "환생"], description: "전생의 기억을 가지고 회귀한 여기사의 성장 복수 판타지 로맨스.", platform: "카카오페이지", link: "https://page.kakao.com/home?seriesId=50000003", thumbnail: "https://placehold.co/192x256/a78bfa/ffffff?text=아도니스", popularity: "major", target_gender: ["female"], target_age_groups: ["teen", "20s", "30s+"] },
+            { id: "webtoon063", title: "나빌레라", keywords: ["드라마", "감동", "성장", "일상", "희망", "발레"], description: "나이 일흔에 발레를 시작한 할아버지와 방황하는 청년의 이야기. 따뜻한 감동과 희망.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=703856", thumbnail: "https://placehold.co/192x256/9ca3af/ffffff?text=나빌레라", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon064", title: "헬퍼", keywords: ["액션", "판타지", "느와르", "긴장", "싸움", "반전"], description: "사후세계에서 벌어지는 영혼들의 싸움. 독특한 세계관과 강렬한 액션.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=567636", thumbnail: "https://placehold.co/192x256/1f2937/ffffff?text=헬퍼", popularity: "major", target_gender: ["male"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon065", title: "김 비서가 왜 그럴까", keywords: ["로맨스", "오피스", "코믹", "설렘", "웃김", "드라마"], description: "재벌 2세와 비서의 퇴사 밀당 로맨스. 유쾌하고 달콤한 오피스 로맨스.", platform: "카카오페이지", link: "https://page.kakao.com/home?seriesId=50000004", thumbnail: "https://placehold.co/192x256/fbcfe8/ffffff?text=김비서", popularity: "major", target_gender: ["female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon066", title: "생활의 참견", keywords: ["일상", "코믹", "개그", "웃김", "공감", "병맛"], description: "김양수 작가의 일상 개그 웹툰. 소소한 재미와 공감.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=26388", thumbnail: "https://placehold.co/192x256/d1d5db/ffffff?text=생활의참견", popularity: "minor", target_gender: ["male", "female"], target_age_groups: ["teen", "20s", "30s+"] },
+            { id: "webtoon067", title: "스위트홈", keywords: ["스릴러", "공포", "괴물", "긴장", "생존", "반전"], description: "괴물로 변해버린 세상에서 살아남기 위한 인간들의 사투. 극강의 스릴러.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=738468", thumbnail: "https://placehold.co/192x256/4a4a4a/ffffff?text=스위트홈", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon068", title: "어글리후드 시즌2", keywords: ["판타지", "액션", "스릴러", "반전", "사회비판", "긴장"], description: "외계인의 지배를 받는 세상에서 저항하는 주인공의 이야기. 더욱 심화된 세계관.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=770162", thumbnail: "https://placehold.co/192x256/a8a29e/ffffff?text=어글리후드2", popularity: "minor", target_gender: ["male", "female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon069", title: "이번 생은 가주가 되겠습니다", keywords: ["로맨스", "판타지", "회귀", "복수", "성장", "설렘"], description: "회귀한 주인공이 가문의 가주가 되어 복수하고 사랑을 찾는 이야기. 흥미진진한 로판.", platform: "카카오페이지", link: "https://page.kakao.com/home?seriesId=50000005", thumbnail: "https://placehold.co/192x256/fecaca/ffffff?text=이번생은가주", popularity: "major", target_gender: ["female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon070", title: "굿바이 사돈", keywords: ["코믹", "일상", "개그", "웃김", "병맛", "가족"], description: "사돈 간의 유쾌하고 예측불허한 일상 이야기. 가족 코믹 웹툰.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=770163", thumbnail: "https://placehold.co/192x256/dbeafe/ffffff?text=굿바이사돈", popularity: "minor", target_gender: ["male", "female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon071", title: "겟앰프드 시즌2", keywords: ["개그", "병맛", "액션", "코믹", "웃김", "일상"], description: "대난투 액션게임 '겟앰프드'의 유쾌한 일상 웹툰. 더욱 강력해진 개그.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=776270", thumbnail: "https://placehold.co/192x256/fca5a5/ffffff?text=겟앰프드2", popularity: "minor", target_gender: ["male"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon072", title: "귀곡의 문", keywords: ["판타지", "액션", "스릴러", "반전", "긴장", "퇴마"], description: "귀신을 보는 능력을 가진 주인공의 퇴마 이야기. 오싹하고 흥미로운 판타지.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=703857", thumbnail: "https://placehold.co/192x256/4a4a4a/ffffff?text=귀곡의문", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["teen", "20s", "30s+"] },
+            { id: "webtoon073", title: "어떤 과학의 초전자포", keywords: ["액션", "판타지", "학원", "성장", "능력", "긴장"], description: "초능력 도시에서 펼쳐지는 미코토의 이야기. 화려한 액션과 흥미로운 능력 배틀.", platform: "카카오웹툰", link: "https://webtoon.kakao.com/content/%EC%96%B4%EB%96%A4-%EA%B3%BC%ED%95%99%EC%9D%98-%EC%B4%88%EC%A0%84%EC%9E%90%ED%8F%AC/12345", thumbnail: "https://placehold.co/192x256/3b82f6/ffffff?text=초전자포", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon074", title: "나 혼자만 레벨업 외전", keywords: ["액션", "성장", "판타지", "사이다", "긴장", "희망"], description: "최약체 헌터가 인류 최강으로 각성하는 이야기의 외전. 본편의 감동을 다시 한번.", platform: "카카오웹툰", link: "https://webtoon.kakao.com/content/%EB%82%98-%ED%98%BC%EC%9E%90%EB%A7%8C-%EB%A0%88%EB%B2%A8%EC%97%85-%EC%99%B8%EC%A0%84/12345", thumbnail: "https://placehold.co/192x256/818cf8/ffffff?text=나혼렙외전", popularity: "major", target_gender: ["male"], target_age_groups: ["teen", "20s", "30s+"] },
+            { id: "webtoon075", title: "바이트 미", keywords: ["로맨스", "판타지", "뱀파이어", "설렘", "드라마", "반전"], description: "뱀파이어와 인간의 금지된 로맨스. 위험하고 매혹적인 이야기.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=770164", thumbnail: "https://placehold.co/192x256/fbcfe8/ffffff?text=바이트미", popularity: "minor", target_gender: ["female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon076", title: "내 ID는 강남미인!", keywords: ["로맨스", "학원", "성장", "일상", "공감", "드라마"], description: "성형수술 후 새 삶을 사는 주인공의 캠퍼스 로맨스. 외모지상주의에 대한 메시지.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=703858", thumbnail: "https://placehold.co/192x256/fecdd3/ffffff?text=강남미인", popularity: "major", target_gender: ["female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon077", title: "어글리후드 시즌3", keywords: ["판타지", "액션", "스릴러", "반전", "사회비판", "긴장"], description: "외계인의 지배를 받는 세상에서 저항하는 주인공의 이야기. 최종장.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=770165", thumbnail: "https://placehold.co/192x256/4a4a4a/ffffff?text=어글리후드3", popularity: "minor", target_gender: ["male", "female"], target_age_groups: ["teen", "20s", "30s+"] },
+            { id: "webtoon078", title: "화산귀환 외전", keywords: ["액션", "무협", "유쾌", "성장", "사이다", "희망", "판타지", "웃김"], description: "매화검존 청명이 환생하여 망해버린 화산을 다시 일으키는 이야기의 외전.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=769210", thumbnail: "https://placehold.co/192x256/818cf8/ffffff?text=화산귀환외전", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["teen", "20s", "30s+"] },
+            { id: "webtoon079", title: "신도림", keywords: ["액션", "포스트아포칼립스", "생존", "긴장", "싸움", "스릴러"], description: "멸망한 서울, 신도림에서 살아남기 위한 인간들의 싸움. 강렬한 액션 스릴러.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=703859", thumbnail: "https://placehold.co/192x256/2d3748/ffffff?text=신도림", popularity: "major", target_gender: ["male"], target_age_groups: ["teen", "20s", "30s+"] },
+            { id: "webtoon080", title: "이세계 삼촌", keywords: ["코믹", "판타지", "개그", "웃김", "병맛", "일상"], description: "이세계에서 돌아온 삼촌의 기상천외한 일상 이야기. 병맛 개그 판타지.", platform: "카카오웹툰", link: "https://webtoon.kakao.com/content/%EC%9D%B4%EC%84%B8%EA%B3%84-%EC%82%BC%EC%B4%8C/12345", thumbnail: "https://placehold.co/192x256/ecc94b/ffffff?text=이세계삼촌", popularity: "minor", target_gender: ["male", "female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon081", title: "어느 날 공주가 되어버렸다 외전", keywords: ["로맨스", "판타지", "드라마", "설렘", "성장", "궁중"], description: "소설 속 비운의 공주로 환생한 주인공의 생존 로맨스 외전.", platform: "카카오페이지", link: "https://page.kakao.com/home?seriesId=50000006", thumbnail: "https://placehold.co/192x256/fbcfe8/ffffff?text=어공주외전", popularity: "major", target_gender: ["female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon082", title: "독립일기 시즌3", keywords: ["일상", "공감", "코믹", "힐링", "웃김", "지루함"], description: "자취 생활의 애환과 소소한 행복을 담은 일상툰. 더욱 깊어진 공감.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=770166", thumbnail: "https://placehold.co/192x256/d69e2e/ffffff?text=독립일기3", popularity: "minor", target_gender: ["male", "female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon083", title: "내일 시즌2", keywords: ["드라마", "감동", "힐링", "슬픔", "희망", "사회문제"], description: "자살을 막는 저승사자들의 이야기. 더욱 따뜻한 위로와 감동.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=703860", thumbnail: "https://placehold.co/192x256/9ca3af/ffffff?text=내일2", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["teen", "20s", "30s+"] },
+            { id: "webtoon084", title: "연애의 정령 시즌2", keywords: ["로맨스", "코믹", "판타지", "설렘", "웃김", "일상"], description: "연애를 도와주는 정령과 함께하는 주인공의 로맨스. 더욱 유쾌하고 발랄한 이야기.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=694839", thumbnail: "https://placehold.co/192x256/fbcfe8/ffffff?text=연애의정령2", popularity: "minor", target_gender: ["male", "female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon085", title: "겟앰프드 시즌3", keywords: ["개그", "병맛", "액션", "코믹", "웃김", "일상"], description: "대난투 액션게임 '겟앰프드'의 유쾌한 일상 웹툰. 마지막 시즌.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=776271", thumbnail: "https://placehold.co/192x256/fca5a5/ffffff?text=겟앰프드3", popularity: "minor", target_gender: ["male"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon086", title: "귀곡의 문 시즌2", keywords: ["판타지", "액션", "스릴러", "반전", "긴장", "퇴마"], description: "귀신을 보는 능력을 가진 주인공의 퇴마 이야기. 더욱 심화된 스토리.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=703861", thumbnail: "https://placehold.co/192x256/4a4a4a/ffffff?text=귀곡의문2", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["teen", "20s", "30s+"] },
+            { id: "webtoon087", title: "어떤 과학의 초전자포 S", keywords: ["액션", "판타지", "학원", "성장", "능력", "긴장"], description: "초능력 도시에서 펼쳐지는 미코토의 이야기. 더욱 강력해진 액션.", platform: "카카오웹툰", link: "https://webtoon.kakao.com/content/%EC%96%B4%EB%96%A4-%EA%B3%BC%ED%95%99%EC%9D%98-%EC%B4%88%EC%A0%84%EC%9E%90%ED%8F%AC-S/12345", thumbnail: "https://placehold.co/192x256/3b82f6/ffffff?text=초전자포S", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon088", title: "나 혼자만 레벨업 완결", keywords: ["액션", "성장", "판타지", "사이다", "긴장", "희망"], description: "최약체 헌터가 인류 최강으로 각성하는 이야기의 완결편.", platform: "카카오웹툰", link: "https://webtoon.kakao.com/content/%EB%82%98-%ED%98%BC%EC%9E%90%EB%A7%8C-%EB%A0%88%EB%B2%A8%EC%97%85-%EC%99%84%EA%B2%B0/12345", thumbnail: "https://placehold.co/192x256/818cf8/ffffff?text=나혼렙완결", popularity: "major", target_gender: ["male"], target_age_groups: ["teen", "20s", "30s+"] },
+            { id: "webtoon089", title: "바이트 미 시즌2", keywords: ["로맨스", "판타지", "뱀파이어", "설렘", "드라마", "반전"], description: "뱀파이어와 인간의 금지된 로맨스. 더욱 깊어진 이야기.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=770167", thumbnail: "https://placehold.co/192x256/fbcfe8/ffffff?text=바이트미2", popularity: "minor", target_gender: ["female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon090", title: "내 ID는 강남미인! 시즌2", keywords: ["로맨스", "학원", "성장", "일상", "공감", "드라마"], description: "성형수술 후 새 삶을 사는 주인공의 캠퍼스 로맨스. 더욱 깊어진 메시지.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=703862", thumbnail: "https://placehold.co/192x256/fecdd3/ffffff?text=강남미인2", popularity: "major", target_gender: ["female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon091", title: "어글리후드 완결", keywords: ["판타지", "액션", "스릴러", "반전", "사회비판", "긴장"], description: "외계인의 지배를 받는 세상에서 저항하는 주인공의 이야기. 대단원의 막.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=770168", thumbnail: "https://placehold.co/192x256/4a4a4a/ffffff?text=어글리후드완결", popularity: "minor", target_gender: ["male", "female"], target_age_groups: ["teen", "20s", "30s+"] },
+            { id: "webtoon092", title: "화산귀환 완결", keywords: ["액션", "무협", "유쾌", "성장", "사이다", "희망", "판타지", "웃김"], description: "매화검존 청명이 환생하여 망해버린 화산을 다시 일으키는 이야기. 최종 완결.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=769211", thumbnail: "https://placehold.co/192x256/818cf8/ffffff?text=화산귀환완결", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["teen", "20s", "30s+"] },
+            { id: "webtoon093", title: "신도림 시즌2", keywords: ["액션", "포스트아포칼립스", "생존", "긴장", "싸움", "스릴러"], description: "멸망한 서울, 신도림에서 살아남기 위한 인간들의 싸움. 더욱 거세진 싸움.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=703863", thumbnail: "https://placehold.co/192x256/2d3748/ffffff?text=신도림2", popularity: "major", target_gender: ["male"], target_age_groups: ["teen", "20s", "30s+"] },
+            { id: "webtoon094", title: "이세계 삼촌 시즌2", keywords: ["코믹", "판타지", "개그", "웃김", "병맛", "일상"], description: "이세계에서 돌아온 삼촌의 기상천외한 일상 이야기. 더욱 강력해진 병맛 개그.", platform: "카카오웹툰", link: "https://webtoon.kakao.com/content/%EC%9D%B4%EC%84%B8%EA%B3%84-%EC%82%BC%EC%B4%8C-2/12345", thumbnail: "https://placehold.co/192x256/ecc94b/ffffff?text=이세계삼촌2", popularity: "minor", target_gender: ["male", "female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon095", title: "어느 날 공주가 되어버렸다 완결", keywords: ["로맨스", "판타지", "드라마", "설렘", "성장", "궁중"], description: "소설 속 비운의 공주로 환생한 주인공의 생존 로맨스. 감동적인 완결.", platform: "카카오페이지", link: "https://page.kakao.com/home?seriesId=50000007", thumbnail: "https://placehold.co/192x256/fbcfe8/ffffff?text=어공주완결", popularity: "major", target_gender: ["female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon096", title: "독립일기 완결", keywords: ["일상", "공감", "코믹", "힐링", "웃김", "지루함"], description: "자취 생활의 애환과 소소한 행복을 담은 일상툰. 대단원의 막.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=770169", thumbnail: "https://placehold.co/192x256/d69e2e/ffffff?text=독립일기완결", popularity: "minor", target_gender: ["male", "female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon097", title: "내일 완결", keywords: ["드라마", "감동", "힐링", "슬픔", "희망", "사회문제"], description: "자살을 막는 저승사자들의 이야기. 감동적인 최종 완결.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=703864", thumbnail: "https://placehold.co/192x256/9ca3af/ffffff?text=내일완결", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["teen", "20s", "30s+"] },
+            { id: "webtoon098", title: "연애의 정령 완결", keywords: ["로맨스", "코믹", "판타지", "설렘", "웃김", "일상"], description: "연애를 도와주는 정령과 함께하는 주인공의 로맨스. 유쾌하고 발랄한 이야기의 완결.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=694840", thumbnail: "https://placehold.co/192x256/fbcfe8/ffffff?text=연애의정령완결", popularity: "minor", target_gender: ["male", "female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon099", title: "겟앰프드 완결", keywords: ["개그", "병맛", "액션", "코믹", "웃김", "일상"], description: "대난투 액션게임 '겟앰프드'의 유쾌한 일상 웹툰. 대단원의 막.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=776272", thumbnail: "https://placehold.co/192x256/fca5a5/ffffff?text=겟앰프드완결", popularity: "minor", target_gender: ["male"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon100", title: "귀곡의 문 완결", keywords: ["판타지", "액션", "스릴러", "반전", "긴장", "퇴마"], description: "귀신을 보는 능력을 가진 주인공의 퇴마 이야기. 최종 완결.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=703865", thumbnail: "https://placehold.co/192x256/4a4a4a/ffffff?text=귀곡의문완결", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["teen", "20s", "30s+"] },
+            { id: "webtoon101", title: "어떤 과학의 초전자포 완결", keywords: ["액션", "판타지", "학원", "성장", "능력", "긴장"], description: "초능력 도시에서 펼쳐지는 미코토의 이야기. 최종 완결.", platform: "카카오웹툰", link: "https://webtoon.kakao.com/content/%EC%96%B4%EB%96%A4-%EA%B3%BC%ED%95%99%EC%9D%98-%EC%B4%88%EC%A0%84%EC%9E%90%ED%8F%AC-%EC%99%84%EA%B2%B0/12345", thumbnail: "https://placehold.co/192x256/3b82f6/ffffff?text=초전자포완결", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon102", title: "바이트 미 완결", keywords: ["로맨스", "판타지", "뱀파이어", "설렘", "드라마", "반전"], description: "뱀파이어와 인간의 금지된 로맨스. 감동적인 최종 완결.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=770170", thumbnail: "https://placehold.co/192x256/fbcfe8/ffffff?text=바이트미완결", popularity: "minor", target_gender: ["female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon103", title: "내 ID는 강남미인! 완결", keywords: ["로맨스", "학원", "성장", "일상", "공감", "드라마"], description: "성형수술 후 새 삶을 사는 주인공의 캠퍼스 로맨스. 감동적인 최종 완결.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=703866", thumbnail: "https://placehold.co/192x256/fecdd3/ffffff?text=강남미인완결", popularity: "major", target_gender: ["female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon104", title: "신도림 완결", keywords: ["액션", "포스트아포칼립스", "생존", "긴장", "싸움", "스릴러"], description: "멸망한 서울, 신도림에서 살아남기 위한 인간들의 싸움. 대단원의 막.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=703867", thumbnail: "https://placehold.co/192x256/2d3748/ffffff?text=신도림완결", popularity: "major", target_gender: ["male"], target_age_groups: ["teen", "20s", "30s+"] },
+            { id: "webtoon105", title: "이세계 삼촌 완결", keywords: ["코믹", "판타지", "개그", "웃김", "병맛", "일상"], description: "이세계에서 돌아온 삼촌의 기상천외한 일상 이야기. 최종 완결.", platform: "카카오웹툰", link: "https://webtoon.kakao.com/content/%EC%9D%B4%EC%84%B8%EA%B3%84-%EC%82%BC%EC%B4%8C-%EC%99%84%EA%B2%B0/12345", thumbnail: "https://placehold.co/192x256/ecc94b/ffffff?text=이세계삼촌완결", popularity: "minor", target_gender: ["male", "female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon106", title: "전지적 독자 시점 외전", keywords: ["판타지", "긴장", "흥미", "반전", "성장", "액션", "희망", "스릴러"], description: "자신이 읽던 소설의 내용대로 세상이 변하면서 벌어지는 이야기의 외전.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=747270", thumbnail: "https://placehold.co/192x256/fcd34d/ffffff?text=전독시외전", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["teen", "20s", "30s+"] },
+            { id: "webtoon107", title: "역대급 영지 설계사 외전", keywords: ["개그", "사이다", "판타지", "성장", "유쾌", "웃김", "희망", "코믹"], description: "잠에서 깨어보니 소설 속 망나니 영주가 되었다! 영지를 개발하는 이야기의 외전.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=770171", thumbnail: "https://placehold.co/192x256/a3e635/ffffff?text=영지설계사외전", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon108", title: "유미의 세포들 시즌2", keywords: ["일상", "공감", "로맨스", "성장", "코믹", "지루함", "설렘", "웃김", "드라마", "힐링"], description: "평범한 직장인 유미의 일상과 그녀의 세포들이 벌이는 유쾌한 이야기. 더욱 깊어진 공감.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=651674", thumbnail: "https://placehold.co/192x256/9ca3af/ffffff?text=유미의세포들2", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon109", title: "내 남편과 결혼해줘 외전", keywords: ["복수", "로맨스", "사이다", "설렘", "화남", "오피스", "드라마", "반전"], description: "시한부인 줄 알았던 아내가 과거로 회귀하여 인생을 바꾸는 드라마의 외전.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=783053", thumbnail: "https://placehold.co/192x256/fbcfe8/ffffff?text=내남결외전", popularity: "major", target_gender: ["female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon110", title: "외모지상주의 시즌2", keywords: ["액션", "긴장", "시원함", "성장", "싸움", "화남", "학원", "사이다"], description: "따돌림 당하던 주인공이 두 개의 몸을 갖게 되며 벌어지는 이야기. 더욱 강력해진 액션.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=641254", thumbnail: "https://placehold.co/192x256/a78bfa/ffffff?text=외모지상주의2", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon111", title: "나노마신 시즌2", keywords: ["무협", "액션", "성장", "사이다", "판타지", "긴장"], description: "미래에서 온 나노 머신을 얻은 주인공의 무협 세계 정복기. 더욱 강해진 주인공.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=738469", thumbnail: "https://placehold.co/192x256/6b7280/ffffff?text=나노마신2", popularity: "major", target_gender: ["male"], target_age_groups: ["teen", "20s", "30s+"] },
+            { id: "webtoon112", title: "재혼 황후 시즌2", keywords: ["로맨스", "복수", "드라마", "설렘", "화남", "궁중", "반전"], description: "황제에게 버림받은 황후가 재혼을 선언하며 벌어지는 이야기. 더욱 심화된 로맨스.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=738470", thumbnail: "https://placehold.co/192x256/fecaca/ffffff?text=재혼황후2", popularity: "major", target_gender: ["female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon113", title: "독고 시즌2", keywords: ["액션", "학원", "복수", "싸움", "긴장", "사이다"], description: "학교 폭력에 맞서는 주인공의 처절한 싸움 이야기. 강렬한 액션.", platform: "카카오웹툰", link: "https://webtoon.kakao.com/content/%EB%8F%85%EA%B3%A0-2/12345", thumbnail: "https://placehold.co/192x256/4b5563/ffffff?text=독고2", popularity: "major", target_gender: ["male"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon114", title: "연놈 시즌2", keywords: ["로맨스", "학원", "일상", "설렘", "공감", "드라마"], description: "풋풋한 고등학생들의 성장과 연애 이야기. 더욱 깊어진 로맨스.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=694841", thumbnail: "https://placehold.co/192x256/fecdd3/ffffff?text=연놈2", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon115", title: "쌉니다 천리마마트 시즌2", keywords: ["코믹", "일상", "개그", "웃김", "병맛", "사회풍자"], description: "좌천된 사장이 문제투성이 마트를 살리는 기상천외한 이야기. 더욱 강력해진 병맛 개그.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=670145", thumbnail: "https://placehold.co/192x256/d1d5db/ffffff?text=천리마마트2", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon116", title: "타인은 지옥이다 시즌2", keywords: ["스릴러", "긴장", "공포", "괴물", "반전", "심리", "화남"], description: "낯선 고시원에서 벌어지는 기괴한 사건들. 더욱 오싹해진 스릴러.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=703868", thumbnail: "https://placehold.co/192x256/4a4a4a/ffffff?text=타인은지옥이다2", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon117", title: "여고생 드래곤 시즌2", keywords: ["판타지", "코믹", "일상", "웃김", "병맛"], description: "평범한 여고생의 몸에 갇힌 드래곤의 좌충우돌 라이프. 더욱 기상천외한 코믹 판타지.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=758041", thumbnail: "https://placehold.co/192x256/a8a29e/ffffff?text=여고생드래곤2", popularity: "minor", target_gender: ["male", "female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon118", title: "정년이 시즌2", keywords: ["드라마", "성장", "희망", "감동", "역사", "뮤지컬"], description: "1950년대 국극단을 배경으로 한 여성들의 꿈과 열정 이야기. 더욱 깊어진 감동.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=728751", thumbnail: "https://placehold.co/192x256/fca5a5/ffffff?text=정년이2", popularity: "major", target_gender: ["female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon119", "title": "취사병 전설이 되다 시즌2", keywords: ["판타지", "성장", "코믹", "사이다", "요리"], description: "게임 속 취사병으로 빙의한 주인공의 군대 요리 정복기. 유쾌한 요리 판타지.", platform: "카카오웹툰", link: "https://webtoon.kakao.com/content/%EC%B7%A8%EC%82%AC%EB%B3%91-%EC%A0%84%EC%84%B8%EC%9D%B4-%EB%90%98%EB%8B%A4-2/12345", thumbnail: "https://placehold.co/192x256/9ca3af/ffffff?text=취사병2", popularity: "major", target_gender: ["male"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon120", title: "소녀의 세계 시즌2", keywords: ["일상", "성장", "공감", "드라마", "우정", "힐링"], description: "평범한 여고생들의 우정과 성장 이야기. 더욱 깊어진 공감.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=654775", thumbnail: "https://placehold.co/192x256/fbcfe8/ffffff?text=소녀의세계2", popularity: "major", target_gender: ["female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon121", title: "멸망한 세계의 유일한 생존자 시즌2", keywords: ["판타지", "액션", "생존", "긴장", "스릴러", "성장"], description: "멸망한 세계에서 홀로 살아남은 주인공의 생존기. 더욱 치열해진 생존.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=770172", thumbnail: "https://placehold.co/192x256/374151/ffffff?text=멸망생존자2", popularity: "minor", target_gender: ["male", "female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon122", title: "오늘도 사랑스럽개 시즌2", keywords: ["로맨스", "코믹", "판타지", "설렘", "웃김", "드라마"], description: "키스하면 개로 변하는 저주에 걸린 여자의 로맨스 코미디. 유쾌하고 사랑스러운 이야기.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=703869", thumbnail: "https://placehold.co/192x256/fecdd3/ffffff?text=오늘도사랑스럽개2", popularity: "major", target_gender: ["female"], target_age_groups: ["teen", "20s", "30s+"] },
+            { id: "webtoon123", title: "호러와 로맨스 시즌2", keywords: ["로맨스", "스릴러", "코믹", "반전", "설렘", "웃김"], description: "호러 웹툰 작가와 로맨스 웹툰 작가의 기묘한 동거 로맨스. 더욱 예측불허의 전개.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=703870", thumbnail: "https://placehold.co/192x256/a78bfa/ffffff?text=호러와로맨스2", popularity: "minor", target_gender: ["male", "female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon124", title: "캐슬 시즌2", keywords: ["액션", "스릴러", "긴장", "복수", "느와르"], description: "어둠의 세계에서 벌어지는 치열한 권력 싸움. 더욱 몰입감 넘치는 느와르 액션.", platform: "카카오웹툰", link: "https://webtoon.kakao.com/content/%EC%BA%90%EC%8A%AC-2/12345", thumbnail: "https://placehold.co/192x256/1f2937/ffffff?text=캐슬2", popularity: "major", target_gender: ["male"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon125", title: "여성향 게임의 파멸 플래그밖에 없는 악역 영애로 전생해버렸다... 시즌2", keywords: ["로맨스", "판타지", "코믹", "설렘", "반전", "성장"], description: "여성향 게임의 악역 영애로 전생한 주인공의 파멸 회피기. 유쾌한 역하렘 판타지.", platform: "카카오페이지", link: "https://page.kakao.com/home?seriesId=50000008", thumbnail: "https://placehold.co/192x256/fbcfe8/ffffff?text=악역영애2", popularity: "major", target_gender: ["female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon126", title: "독립운동가 웹툰 시즌2", keywords: ["드라마", "역사", "감동", "희망", "성장", "애국"], description: "잊혀진 독립운동가들의 이야기를 다룬 웹툰. 더욱 깊어진 역사와 감동.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=770173", thumbnail: "https://placehold.co/192x256/9ca3af/ffffff?text=독립운동가2", popularity: "minor", target_gender: ["male", "female"], target_age_groups: ["teen", "20s", "30s+"] },
+            { id: "webtoon127", title: "대학일기 시즌2", keywords: ["일상", "코믹", "웃김", "공감", "지루함", "병맛"], description: "평범한 대학생의 좌충우돌 캠퍼스 라이프. 더욱 강력해진 현실 공감 개그 웹툰.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=679565", thumbnail: "https://placehold.co/192x256/d1d5db/ffffff?text=대학일기2", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon128", title: "프리드로우 시즌2", keywords: ["학원", "액션", "코믹", "성장", "일상", "웃김"], description: "일진에서 벗어나고 싶은 주인공의 고군분투 학원물. 유쾌한 성장 드라마.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=597479", thumbnail: "https://placehold.co/192x256/a3e635/ffffff?text=프리드로우2", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon129", title: "가담항설 시즌2", keywords: ["판타지", "액션", "드라마", "성장", "감동", "동양풍"], description: "말이 곧 현실이 되는 세상에서 펼쳐지는 이야기. 더욱 아름다운 동양 판타지.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=694842", thumbnail: "https://placehold.co/192x256/fcd34d/ffffff?text=가담항설2", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["teen", "20s", "30s+"] },
+            { id: "webtoon130", title: "정글고 시즌2", keywords: ["코믹", "학원", "개그", "웃김", "병맛", "일상"], description: "기상천외한 정글고 학생들의 학교생활 이야기. 더욱 강력해진 학원 개그 웹툰.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=60292", thumbnail: "https://placehold.co/192x256/ed8936/ffffff?text=정글고2", popularity: "minor", target_gender: ["male", "female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon131", title: "아침을 지나 밤으로 시즌2", keywords: ["로맨스", "일상", "드라마", "힐링", "설렘", "공감"], description: "잔잔한 일상 속에서 피어나는 따뜻한 로맨스 이야기. 더욱 감성적인 웹툰.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=770174", thumbnail: "https://placehold.co/192x256/fbcfe8/ffffff?text=아침밤2", popularity: "minor", target_gender: ["female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon132", title: "이두나! 시즌2", keywords: ["로맨스", "드라마", "설렘", "일상", "성장", "아이돌"], description: "은퇴한 아이돌과 평범한 대학생의 로맨스. 현실적인 청춘 로맨스.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=703871", thumbnail: "https://placehold.co/192x256/dbeafe/ffffff?text=이두나2", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["20s"] },
+            { id: "webtoon133", title: "어쩌다 발견한 하루 시즌2", keywords: ["로맨스", "판타지", "학원", "설렘", "반전", "드라마"], description: "만화 속 엑스트라임을 알게 된 여고생의 운명 개척 로맨스. 더욱 흥미진진한 스토리.", platform: "카카오웹툰", link: "https://webtoon.kakao.com/content/%EC%96%B4%EC%A9%8C%EB%8B%A4-%EB%B0%9C%EA%B2%AC%ED%95%9C-%ED%95%98%EB%A3%A8-2/12345", thumbnail: "https://placehold.co/192x256/bfdbfe/ffffff?text=어하루2", popularity: "major", target_gender: ["female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon134", title: "신과 함께 시즌2", keywords: ["판타지", "드라마", "감동", "철학", "성장", "슬픔"], description: "죽은 자들이 겪는 저승에서의 이야기. 더욱 깊은 통찰.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=119875", thumbnail: "https://placehold.co/192x256/4a5568/ffffff?text=신과함께2", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon135", title: "뷰티풀 군바리 시즌2", keywords: ["드라마", "현실", "성장", "슬픔", "화남", "군대"], description: "여성 의무경찰들의 군대 생활 이야기. 더욱 현실적인 군대 드라마.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=670146", thumbnail: "https://placehold.co/192x256/6b7280/ffffff?text=뷰티풀군바리2", popularity: "major", target_gender: ["female"], target_age_groups: ["teen", "20s", "30s+"] },
+            { id: "webtoon136", title: "복학왕 시즌2", keywords: ["코믹", "일상", "병맛", "웃김", "사회풍자", "지루함"], description: "기안84 작가의 현실 풍자 개그 웹툰. 더욱 강력해진 사회 비판적인 유머.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=626907", thumbnail: "https://placehold.co/192x256/d1d5db/ffffff?text=복학왕2", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon137", title: "갓 오브 하이스쿨 시즌2", keywords: ["액션", "판타지", "싸움", "성장", "긴장", "사이다"], description: "전국 고교생 최강자를 가리는 대회에서 벌어지는 이야기. 더욱 화려한 액션 판타지.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=318996", thumbnail: "https://placehold.co/192x256/3b82f6/ffffff?text=갓오하2", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon138", title: "투신전생기 시즌2", keywords: ["판타지", "액션", "성장", "복수", "사이다", "무협"], description: "배신당한 투신이 과거로 회귀하여 복수를 다짐하는 이야기. 더욱 시원한 복수극.", platform: "카카오웹툰", link: "https://webtoon.kakao.com/content/%ED%88%AC%EC%8B%A0%EC%A0%84%EC%83%9D%EA%B8%B0-2/12345", thumbnail: "https://placehold.co/192x256/60a5fa/ffffff?text=투신전생기2", popularity: "minor", target_gender: ["male"], target_age_groups: ["teen", "20s", "30s+"] },
+            { id: "webtoon139", title: "나 혼자 탑에서 회귀 시즌2", keywords: ["판타지", "액션", "성장", "회귀", "사이다", "긴장"], description: "탑에서 회귀한 주인공이 과거의 후회를 바로잡는 이야기. 압도적인 능력으로 성장.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=770175", thumbnail: "https://placehold.co/192x256/818cf8/ffffff?text=나혼탑2", popularity: "minor", target_gender: ["male"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon140", title: "호텔 델루나 시즌2", keywords: ["판타지", "로맨스", "드라마", "슬픔", "감동", "반전"], description: "떠도는 영혼들에게 서비스를 제공하는 호텔 델루나의 이야기. 더욱 신비로운 로맨스 판타지.", platform: "카카오웹툰", link: "https://webtoon.kakao.com/content/%ED%98%B8%ED%85%94-%EB%8D%B8%EB%A3%A8%EB%82%98-2/12345", thumbnail: "https://placehold.co/192x256/a78bfa/ffffff?text=호텔델루나2", popularity: "major", target_gender: ["female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon141", title: "백수세끼 시즌2", keywords: ["일상", "공감", "코믹", "힐링", "웃김", "지루함"], description: "백수 생활의 소소한 즐거움과 애환을 담은 웹툰. 더욱 현실적인 공감 개그.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=758042", thumbnail: "https://placehold.co/192x256/dbeafe/ffffff?text=백수세끼2", popularity: "minor", target_gender: ["male", "female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon142", title: "격기 3반 시즌2", keywords: ["액션", "학원", "싸움", "성장", "긴장", "스포츠"], description: "격투기를 통해 성장하는 학생들의 이야기. 더욱 시원한 액션과 드라마.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=703872", thumbnail: "https://placehold.co/192x256/3182ce/ffffff?text=격기3반2", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon143", title: "N번째 연애 시즌2", keywords: ["로맨스", "일상", "공감", "드라마", "설렘", "현실"], description: "현실적인 연애의 모습을 담은 웹툰. 더욱 깊어진 공감을 얻은 작품.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=703873", thumbnail: "https://placehold.co/192x256/fecdd3/ffffff?text=N번째연애2", popularity: "major", target_gender: ["female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon144", title: "김 비서가 왜 그럴까 시즌2", keywords: ["로맨스", "오피스", "코믹", "설렘", "웃김", "드라마"], description: "재벌 2세와 비서의 퇴사 밀당 로맨스. 유쾌하고 달콤한 오피스 로맨스.", platform: "카카오페이지", link: "https://page.kakao.com/home?seriesId=50000009", thumbnail: "https://placehold.co/192x256/fbcfe8/ffffff?text=김비서2", popularity: "major", target_gender: ["female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon145", title: "생활의 참견 시즌2", keywords: ["일상", "코믹", "개그", "웃김", "공감", "병맛"], description: "김양수 작가의 일상 개그 웹툰. 더욱 소소한 재미와 공감.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=26389", thumbnail: "https://placehold.co/192x256/d1d5db/ffffff?text=생활의참견2", popularity: "minor", target_gender: ["male", "female"], target_age_groups: ["teen", "20s", "30s+"] },
+            { id: "webtoon146", title: "스위트홈 시즌2", keywords: ["스릴러", "공포", "괴물", "긴장", "생존", "반전"], description: "괴물로 변해버린 세상에서 살아남기 위한 인간들의 사투. 더욱 극강의 스릴러.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=738471", thumbnail: "https://placehold.co/192x256/4a4a4a/ffffff?text=스위트홈2", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon147", title: "이번 생은 가주가 되겠습니다 시즌2", keywords: ["로맨스", "판타지", "회귀", "복수", "성장", "설렘"], description: "회귀한 주인공이 가문의 가주가 되어 복수하고 사랑을 찾는 이야기. 더욱 흥미진진한 로판.", platform: "카카오페이지", link: "https://page.kakao.com/home?seriesId=50000010", thumbnail: "https://placehold.co/192x256/fecaca/ffffff?text=이번생은가주2", popularity: "major", target_gender: ["female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon148", title: "굿바이 사돈 시즌2", keywords: ["코믹", "일상", "개그", "웃김", "병맛", "가족"], description: "사돈 간의 유쾌하고 예측불허한 일상 이야기. 더욱 강력해진 가족 코믹 웹툰.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=770176", thumbnail: "https://placehold.co/192x256/dbeafe/ffffff?text=굿바이사돈2", popularity: "minor", target_gender: ["male", "female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon149", title: "귀곡의 문 시즌3", keywords: ["판타지", "액션", "스릴러", "반전", "긴장", "퇴마"], description: "귀신을 보는 능력을 가진 주인공의 퇴마 이야기. 최종장.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=703874", thumbnail: "https://placehold.co/192x256/4a4a4a/ffffff?text=귀곡의문3", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["teen", "20s", "30s+"] },
+            { id: "webtoon150", title: "어떤 과학의 초전자포 T", keywords: ["액션", "판타지", "학원", "성장", "능력", "긴장"], description: "초능력 도시에서 펼쳐지는 미코토의 이야기. 마지막 시즌.", platform: "카카오웹툰", link: "https://webtoon.kakao.com/content/%EC%96%B4%EB%96%A4-%EA%B3%BC%ED%95%99%EC%9D%98-%EC%B4%88%EC%A0%84%EC%9E%90%ED%8F%AC-T/12345", thumbnail: "https://placehold.co/192x256/3b82f6/ffffff?text=초전자포T", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["teen", "20s"] },
+            // 추가 웹툰 데이터
+            { id: "webtoon151", title: "환생한 암살자는 검술 천재", keywords: ["판타지", "액션", "환생", "성장", "사이다", "무협"], description: "최강의 암살자가 검술 천재로 환생하여 새로운 삶을 살아가는 이야기.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=770177", thumbnail: "https://placehold.co/192x256/78716c/ffffff?text=환생암살자", popularity: "minor", target_gender: ["male"], target_age_groups: ["teen", "20s", "30s+"] },
+            { id: "webtoon152", title: "악녀는 두 번 산다", keywords: ["로맨스", "복수", "회귀", "드라마", "설렘", "반전"], description: "악녀로 살다 죽은 여주인공이 과거로 돌아와 운명을 바꾸는 이야기.", platform: "카카오페이지", link: "https://page.kakao.com/home?seriesId=50000011", thumbnail: "https://placehold.co/192x256/f7d4d4/ffffff?text=악녀두번", popularity: "major", target_gender: ["female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon153", title: "호랑이형님 외전", keywords: ["액션", "판타지", "긴장", "무협", "싸움", "스릴러"], description: "신비한 힘을 가진 호랑이와 인간들의 대서사시 외전.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=670147", thumbnail: "https://placehold.co/192x256/2d3748/ffffff?text=호랑이형님외전", popularity: "major", target_gender: ["male"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon154", title: "마음의 소리 시즌2", keywords: ["개그", "일상", "코믹", "웃김", "병맛", "힐링"], description: "조석 작가의 기상천외한 일상 개그 웹툰. 더욱 강력해진 개그.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=20854", thumbnail: "https://placehold.co/192x256/ecc94b/ffffff?text=마음의소리2", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["teen", "20s", "30s+"] },
+            { id: "webtoon155", title: "독립일기 시즌4", keywords: ["일상", "공감", "코믹", "힐링", "웃김", "지루함"], description: "자취 생활의 애환과 소소한 행복을 담은 일상툰. 더욱 깊어진 공감.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=770178", thumbnail: "https://placehold.co/192x256/d69e2e/ffffff?text=독립일기4", popularity: "minor", target_gender: ["male", "female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon156", title: "윈드브레이커 시즌2", keywords: ["액션", "학원", "성장", "스포츠", "긴장"], description: "자전거 크루들의 뜨거운 우정과 경쟁을 그린 스포츠 액션 웹툰. 더욱 치열해진 경쟁.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=626908", thumbnail: "https://placehold.co/192x256/38a169/ffffff?text=윈드브레이커2", popularity: "major", target_gender: ["male"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon157", title: "여신강림 시즌2", keywords: ["로맨스", "학원", "설렘", "일상", "드라마", "공감"], description: "메이크업으로 여신이 된 여고생의 아슬아슬 이중생활 로맨스. 더욱 깊어진 로맨스.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=703875", thumbnail: "https://placehold.co/192x256/48bb78/ffffff?text=여신강림2", popularity: "major", target_gender: ["female"], target_age_groups: ["teen", "20s"] },
+            { id: "webtoon158", title: "참교육 시즌2", keywords: ["액션", "사이다", "화남", "학원", "긴장"], description: "무너진 교권을 바로 세우기 위한 정의 구현 웹툰. 더욱 통쾌한 액션.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=758043", thumbnail: "https://placehold.co/192x256/3182ce/ffffff?text=참교육2", popularity: "major", target_gender: ["male", "female"], target_age_groups: ["teen", "20s", "30s+"] },
+            { id: "webtoon159", title: "좀비딸 시즌2", keywords: ["코믹", "슬픔", "일상", "감동", "드라마", "웃김", "힐링"], description: "어느 날 갑자기 좀비가 된 딸과 아빠의 기묘한 동거 이야기. 웃음과 감동.", platform: "네이버 웹툰", link: "https://comic.naver.com/webtoon/list?titleId=703876", thumbnail: "https://placehold.co/192x256/63b3ed/ffffff?text=좀비딸2", popularity: "minor", target_gender: ["male", "female"], target_age_groups: ["20s", "30s+"] },
+            { id: "webtoon160", title: "튜토리얼 탑의 회귀자 시즌2", keywords: ["판타지", "액션", "성장", "긴장", "사이다", "무협"], description: "끝없는 튜토리얼 탑에 갇혔던 주인공이 회귀하여 다시 탑을 오르는 이야기. 더욱 강력해진 능력.", platform: "카카오웹툰", link: "https://webtoon.kakao.com/content/%ED%8A%9C%ED%86%A0%EB%A6%AC%EC%96%BC-%ED%86%B1%EC%9D%98-%ED%9A%8C%EA%B7%80%EC%9E%90-2/12345", thumbnail: "https://placehold.co/192x256/7f9cf5/ffffff?text=튜토리얼탑2", popularity: "minor", target_gender: ["male"], target_age_groups: ["teen", "20s"] }
+        ];
+
+        // HTML 요소 참조
+        const inputSection = document.getElementById('input-section');
+        const recommendationResultSection = document.getElementById('recommendation-result');
+        const webtoonDisplayGrid = document.getElementById('webtoon-display-grid');
+        const loadingSpinner = document.getElementById('loading-spinner'); // 로딩 스피너 요소 추가
+        const recommendationTitle = document.getElementById('recommendation-title'); // 추천 결과 제목 요소 추가
+
+        // 필터 요소들
+        const genderRadios = document.querySelectorAll('input[name="gender"]');
+        const ageFilter = document.getElementById('age-filter');
+        const preferenceCheckboxes = document.querySelectorAll('input[name="preference"]');
+        const moodCheckboxes = document.querySelectorAll('input[name="mood"]');
+        const popularityFilter = document.getElementById('popularity-filter');
+
+        // 액션 버튼들
+        const getRecommendationBtn = document.getElementById('get-recommendation-btn');
+        const randomRecommendBtn = document.getElementById('random-recommend-btn');
+        const anotherRecommendBtn = document.getElementById('another-recommend-btn');
+        const goBackBtn = document.getElementById('go-back-btn');
+
+        // 현재 선택된 필터 값 저장 변수
+        let currentSelectedGender = 'all';
+        let currentSelectedAgeGroup = 'all';
+        let currentSelectedPreferences = []; // 여러 개 선택 가능
+        let currentSelectedMood = []; // 여러 개 선택 가능 (배열로 변경)
+        let currentSelectedPopularity = 'all';
+        let lastRecommendedWebtoons = []; // 마지막으로 추천된 웹툰 목록을 저장
+
+        // --- UI 상호작용 로직 ---
+
+        // 라디오/체크박스 변경 시 UI 업데이트 및 값 저장
+        function setupSelectionListeners(inputs, isRadio = false) {
+            inputs.forEach(input => {
+                const label = input.closest('.selection-label');
+
+                // 라벨 클릭 이벤트 리스너 추가 (숨겨진 input의 change 이벤트를 강제 발생)
+                label.addEventListener('click', (event) => {
+                    // 클릭 이벤트가 실제 input에서 발생하지 않았다면 (즉, 라벨 영역을 클릭했다면)
+                    if (event.target !== input) {
+                        input.checked = isRadio ? true : !input.checked; // 라디오는 true, 체크박스는 토글
+                        // input의 change 이벤트를 수동으로 발생시켜, 아래의 input change 리스너가 작동하도록 함
+                        input.dispatchEvent(new Event('change', { bubbles: true })); // bubbles: true로 설정하여 이벤트 전파
+                    }
+                });
+
+                // input의 native change 이벤트 리스너 추가 (실제 input 상태 변경 시)
+                input.addEventListener('change', () => {
+                    if (isRadio) { // 라디오 버튼 그룹 (성별)
+                        // 같은 name 그룹의 모든 라디오 버튼에 대해 selected 클래스 업데이트
+                        document.querySelectorAll(`input[name="${input.name}"]`).forEach(otherInput => {
+                            const otherLabel = otherInput.closest('.selection-label');
+                            if (otherInput.checked) {
+                                otherLabel.classList.add('selected');
+                            } else {
+                                otherLabel.classList.remove('selected');
+                            }
+                        });
+                    } else { // 체크박스 그룹 (취향, 감정)
+                        if (input.checked) {
+                            label.classList.add('selected');
+                        } else {
+                            label.classList.remove('selected');
+                        }
+                    }
+
+                    // 현재 선택 값 업데이트
+                    if (input.name === 'gender') {
+                        currentSelectedGender = input.value;
+                    } else if (input.name === 'preference') {
+                        currentSelectedPreferences = Array.from(document.querySelectorAll('input[name="preference"]:checked')).map(cb => cb.value);
+                    } else if (input.name === 'mood') {
+                        currentSelectedMood = Array.from(document.querySelectorAll('input[name="mood"]:checked')).map(cb => cb.value);
+                    }
+                });
+            });
+        }
+
+        // 초기 설정: 각 필터에 리스너 연결
+        setupSelectionListeners(genderRadios, true); // 성별 (라디오)
+        setupSelectionListeners(preferenceCheckboxes); // 취향 (체크박스)
+        setupSelectionListeners(moodCheckboxes); // 감정 (체크박스)
+
+        // 드롭다운 변경 시 값 저장
+        ageFilter.addEventListener('change', () => {
+            currentSelectedAgeGroup = ageFilter.value;
+        });
+        popularityFilter.addEventListener('change', () => {
+            currentSelectedPopularity = popularityFilter.value;
+        });
+
+        // --- 추천 로직 ---
+
+        // 모든 필터 값을 가져오는 함수 (주로 버튼 클릭 시 최신 값 반영)
+        function getAllFilterValues() {
+            currentSelectedGender = document.querySelector('input[name="gender"]:checked').value;
+            currentSelectedAgeGroup = ageFilter.value;
+            currentSelectedPreferences = Array.from(document.querySelectorAll('input[name="preference"]:checked')).map(cb => cb.value);
+            currentSelectedMood = Array.from(document.querySelectorAll('input[name="mood"]:checked')).map(cb => cb.value);
+            currentSelectedPopularity = popularityFilter.value;
+        }
+
+        // 웹툰 추천 함수
+        function recommendWebtoon(isRandom = false) {
+            // 로딩 스피너 표시 및 UI 상태 변경
+            loadingSpinner.classList.remove('hidden'); // 스피너 보이기
+            webtoonDisplayGrid.innerHTML = ''; // 이전 결과 지우기
+            recommendationResultSection.classList.remove('hidden'); // 결과 섹션이 보이도록
+            inputSection.classList.add('hidden'); // 입력 섹션 숨기기
+
+            // 실제 API 호출이 없는 경우, 시뮬레이션된 지연 시간 추가 (UX 개선 목적)
+            setTimeout(() => {
+                let filteredWebtoons = [...webtoonData]; // 전체 웹툰 데이터 복사
+                let message = "당신에게 추천하는 웹툰!"; // 기본 메시지
+
+                // 랜덤 추천이 아닐 경우에만 모든 필터 적용
+                if (!isRandom) {
+                    // 1. 성별 필터
+                    if (currentSelectedGender !== 'all') {
+                        filteredWebtoons = filteredWebtoons.filter(webtoon =>
+                            webtoon.target_gender.includes(currentSelectedGender) || webtoon.target_gender.includes('all')
+                        );
+                    }
+
+                    // 2. 연령대 필터
+                    if (currentSelectedAgeGroup !== 'all') {
+                        filteredWebtoons = filteredWebtoons.filter(webtoon =>
+                            webtoon.target_age_groups.includes(currentSelectedAgeGroup) || webtoon.target_age_groups.includes('all')
+                        );
+                    }
+
+                    // 3. 취향(장르/분위기) 필터 (하나라도 일치하면 포함)
+                    if (currentSelectedPreferences.length > 0) {
+                        filteredWebtoons = filteredWebtoons.filter(webtoon =>
+                            currentSelectedPreferences.some(pref => webtoon.keywords.includes(pref))
+                        );
+                    }
+
+                    // 4. 감정 필터 (선택된 감정이 있다면)
+                    if (currentSelectedMood.length > 0) {
+                        filteredWebtoons = filteredWebtoons.filter(webtoon =>
+                            currentSelectedMood.some(mood => webtoon.keywords.includes(mood))
+                        );
+                    }
+
+                    // 5. 인기도 필터
+                    if (currentSelectedPopularity !== 'all') {
+                        filteredWebtoons = filteredWebtoons.filter(webtoon =>
+                            webtoon.popularity === currentSelectedPopularity
+                        );
+                    }
+                } else { // 랜덤 추천일 경우, 성별/연령/인기도만 적용하고 취향/감정은 무시
+                    // 1. 성별 필터
+                    if (currentSelectedGender !== 'all') {
+                        filteredWebtoons = filteredWebtoons.filter(webtoon =>
+                            webtoon.target_gender.includes(currentSelectedGender) || webtoon.target_gender.includes('all')
+                        );
+                    }
+
+                    // 2. 연령대 필터
+                    if (currentSelectedAgeGroup !== 'all') {
+                        filteredWebtoons = filteredWebtoons.filter(webtoon =>
+                            webtoon.target_age_groups.includes(currentSelectedAgeGroup) || webtoon.target_age_groups.includes('all')
+                        );
+                    }
+                    // 3. 인기도 필터
+                    if (currentSelectedPopularity !== 'all') {
+                        filteredWebtoons = filteredWebtoons.filter(webtoon =>
+                            webtoon.popularity === currentSelectedPopularity
+                        );
+                    }
+                }
+
+                if (filteredWebtoons.length === 0) {
+                    // 필터링된 웹툰이 없을 경우, 전체 웹툰에서 랜덤으로 추천
+                    filteredWebtoons = [...webtoonData];
+                    message = "선택하신 조건에 맞는 웹툰은 없지만, 다른 웹툰을 추천해 드릴게요!";
+                }
+
+                // 중복 추천 방지를 위해 이전에 추천된 목록에서 제외
+                let availableWebtoons = filteredWebtoons.filter(webtoon =>
+                    !lastRecommendedWebtoons.some(rec => rec.id === webtoon.id)
+                );
+
+                // 만약 모든 웹툰이 이미 추천되었다면, 다시 처음부터 추천 가능하게 초기화
+                if (availableWebtoons.length === 0) {
+                    availableWebtoons = [...filteredWebtoons];
+                    lastRecommendedWebtoons = [];
+                }
+
+                // 최대 4개의 웹툰을 랜덤으로 선택하여 추천
+                const numToRecommend = Math.min(availableWebtoons.length, 4);
+                const recommendedList = [];
+                const tempAvailable = [...availableWebtoons];
+
+                for (let i = 0; i < numToRecommend; i++) {
+                    const randomIndex = Math.floor(Math.random() * tempAvailable.length);
+                    recommendedList.push(tempAvailable[randomIndex]);
+                    tempAvailable.splice(randomIndex, 1); // 선택된 웹툰은 제거하여 중복 방지
+                }
+
+                lastRecommendedWebtoons = recommendedList; // 추천된 목록 저장
+                recommendationTitle.textContent = message; // 제목 업데이트
+                displayWebtoons(recommendedList); // 여러 웹툰 표시
+
+                loadingSpinner.classList.add('hidden'); // 스피너 숨기기
+            }, 700); // 0.7초 지연 시뮬레이션
+        }
+
+        // 여러 웹툰 정보를 화면에 표시하는 함수
+        function displayWebtoons(webtoons) {
+            webtoonDisplayGrid.innerHTML = ''; // 기존 내용 지우기
+            if (webtoons.length === 0) {
+                // 이 블록은 filteredWebtoons가 0일 때 이미 전체 웹툰으로 대체되므로,
+                // 이 시점에서는 사실상 실행되지 않습니다.
+                // 하지만 혹시 모를 상황에 대비하여 유지합니다.
+                webtoonDisplayGrid.innerHTML = `
+                    <p class="text-gray-700 text-lg col-span-full">선택하신 조건에 맞는 웹툰이 없습니다. 다른 조건을 선택해주세요.</p>
+                `;
+                return;
+            }
+            webtoons.forEach(webtoon => {
+                // 인기도 텍스트 변환
+                const popularityText = webtoon.popularity === 'major' ? '메이저' : '마이너';
+                // 대상 성별 텍스트 변환
+                const targetGenderText = webtoon.target_gender.includes('all') ? '남녀노소' :
+                                         webtoon.target_gender.includes('male') && webtoon.target_gender.includes('female') ? '남녀 모두' :
+                                         webtoon.target_gender.includes('male') ? '남성' : '여성';
+                // 대상 연령대 텍스트 변환
+                const targetAgeGroupsText = webtoon.target_age_groups.includes('all') ? '전 연령' :
+                                            webtoon.target_age_groups.map(age => {
+                                                if (age === 'teen') return '10대';
+                                                if (age === '20s') return '20대';
+                                                if (age === '30s+') return '30대 이상';
+                                                return age; // Fallback for any unexpected values
+                                            }).join(', ');
+                // 키워드를 태그 형태로 변환
+                const keywordsHtml = webtoon.keywords.map(keyword => `<span>${keyword}</span>`).join('');
+
+                const webtoonCardHtml = `
+                    <div class="webtoon-card">
+                        <div class="webtoon-thumbnail-container">
+                            <h3 class="webtoon-title-fallback">${webtoon.title}</h3>
+                        </div>
+                        <div class="webtoon-info">
+                            <h3 class="webtoon-title">${webtoon.title}</h3>
+                            <p class="webtoon-description">${webtoon.description}</p>
+                            <p class="webtoon-detail-info">플랫폼: ${webtoon.platform}</p>
+                            <p class="webtoon-detail-info">인기도: ${popularityText}</p>
+                            <p class="webtoon-detail-info">대상: ${targetGenderText}, ${targetAgeGroupsText}</p>
+                            <div class="webtoon-keywords flex flex-wrap">${keywordsHtml}</div>
+                            <a href="${webtoon.link}" target="_blank" class="webtoon-link-button">웹툰 보러가기</a>
+                        </div>
+                    </div>
+                `;
+                webtoonDisplayGrid.insertAdjacentHTML('beforeend', webtoonCardHtml);
+            });
+        }
+
+        // --- 이벤트 리스너 ---
+
+        // '웹툰 추천받기' 버튼 클릭 시
+        getRecommendationBtn.addEventListener('click', () => {
+            getAllFilterValues(); // 모든 필터 값 업데이트
+            recommendWebtoon(false); // 랜덤 아님
+        });
+
+        // '랜덤 웹툰 추천' 버튼 클릭 시
+        randomRecommendBtn.addEventListener('click', () => {
+            // 랜덤 추천 시에는 취향과 감정 필터는 무시하고, 현재 선택된 성별, 연령, 인기도 필터만 적용
+            getAllFilterValues(); // 현재 선택된 필터 값 가져오기
+
+            // 취향 및 감정 선택 UI 초기화 (시각적으로만)
+            currentSelectedMood = []; // 배열 초기화
+            moodCheckboxes.forEach(cb => cb.checked = false);
+            document.querySelectorAll('#mood-selection-checkboxes .selection-label').forEach(label => label.classList.remove('selected'));
+
+            currentSelectedPreferences = []; // 배열 초기화
+            preferenceCheckboxes.forEach(cb => cb.checked = false);
+            document.querySelectorAll('#preference-selection-checkboxes .selection-label').forEach(label => label.classList.remove('selected'));
+
+            recommendWebtoon(true); // 랜덤 추천
+        });
+
+        // '다른 웹툰 추천' 버튼 클릭 시 (이전에 선택된 필터 유지)
+        anotherRecommendBtn.addEventListener('click', () => {
+            // 현재 저장된 필터 값으로 다시 추천
+            recommendWebtoon(false); // 랜덤 아님
+        });
+
+        // '처음으로 돌아가기' 버튼 클릭 시
+        goBackBtn.addEventListener('click', () => {
+            inputSection.classList.remove('hidden');
+            recommendationResultSection.classList.add('hidden');
+
+            // 모든 필터 UI 초기화
+            document.querySelector('input[name="gender"][value="all"]').checked = true;
+            document.querySelector('input[name="gender"][value="all"]').closest('.selection-label').classList.add('selected'); // '상관없음' 선택 상태로
+            document.querySelector('input[name="gender"][value="male"]').closest('.selection-label').classList.remove('selected');
+            document.querySelector('input[name="gender"][value="female"]').closest('.selection-label').classList.remove('selected');
+
+            ageFilter.value = 'all';
+
+            preferenceCheckboxes.forEach(cb => cb.checked = false);
+            document.querySelectorAll('#preference-selection-checkboxes .selection-label').forEach(label => label.classList.remove('selected'));
+
+            moodCheckboxes.forEach(cb => cb.checked = false); // 체크박스 초기화
+            document.querySelectorAll('#mood-selection-checkboxes .selection-label').forEach(label => label.classList.remove('selected'));
+
+            popularityFilter.value = 'all';
+
+            // 저장된 값 초기화
+            currentSelectedGender = 'all';
+            currentSelectedAgeGroup = 'all';
+            currentSelectedPreferences = [];
+            currentSelectedMood = [];
+            currentSelectedPopularity = 'all';
+            lastRecommendedWebtoons = [];
+
+            // 추천 결과 제목 초기화
+            recommendationTitle.textContent = "당신에게 추천하는 웹툰!";
+        });
+
+        // 페이지 로드 시 초기 성별 '상관없음' 선택 상태 표시
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelector('input[name="gender"][value="all"]').closest('.selection-label').classList.add('selected');
+        });
+    </script>
+</body>
+</html>
